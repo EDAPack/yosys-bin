@@ -1,0 +1,67 @@
+name: CI
+on:
+  push:
+  workflow_dispatch:
+  schedule:
+    # Every Sunday at 12PM UTC
+    - cron: "0 12 * * 0"
+
+jobs:
+    ci-linux:
+        runs-on: 'ubuntu-latest'
+        steps:
+            - uses: actions/checkout@v4
+            - name: check_is_needed
+              id: is_needed
+              env:
+                BUILD_NUM: ${{ github.run_id }}
+              run: |
+                yosys_latest_rls=$(curl -s -L \
+                    -H "Accept: application/vnd.github+json" \
+                    -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+                    -H "X-GitHub-Api-Version: 2022-11-28" \
+                    https://api.github.com/repos/YosysHQ/yosys/git/refs/tags | \
+                    jq ".[].ref" | sed -e's%refs/tags/%%' -e 's/\"//g'| sort | tail -n 1)
+                echo "yosys_latest_rls: ${yosys_latest_rls}"
+                yosys_version=$(echo $yosys_latest_rls | sed -e 's/^v//')
+
+                echo "yosys_latest_rls=${yosys_latest_rls}" >> ${GITHUB_OUTPUT}
+                echo "yosys_version=${yosys_version}.${BUILD_NUM}" >> ${GITHUB_OUTPUT}
+            - name: build
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                BUILD_NUM: ${{ github.run_id }}
+                CI_BUILD: 1
+                yosys_version: ${{ steps.is_needed.outputs.yosys_version }}
+              run: >
+                docker run --rm
+                --volume "$(pwd):/io"
+                --env BUILD_NUM
+                --env CI_BUILD
+                --env yosys_version
+                --workdir /io
+                quay.io/pypa/manylinux2014_x86_64
+                /io/scripts/build.sh
+            - name: Create Release
+              id: create_release
+              uses: actions/create-release@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                BUILD_NUM: ${{ github.run_id }}
+              with:
+                tag_name: "v${{ steps.is_needed.outputs.yosys_version }}"
+                release_name: "Release ${{ steps.is_needed.outputs.yosys_version }}"
+                body: |
+                  Build of Yosys ${{ steps.is_needed.outputs.yosys_version }}
+                draft: false
+                prerelease: false
+            - name: Upload Files
+              uses: actions/upload-release-asset@v1
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                BUILD_NUM: ${{ github.run_id }}
+              with:
+                upload_url: ${{ steps.create_release.outputs.upload_url }}
+                asset_path: "./release/yosys-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
+                asset_name: "yosys-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
+                asset_content_type: application/gzip
