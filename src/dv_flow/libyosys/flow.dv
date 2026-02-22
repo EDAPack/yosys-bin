@@ -1,0 +1,479 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+#****************************************************************************
+#* flow.dv
+#*
+#* Copyright 2023-2025 Matthew Ballance and Contributors
+#*
+#* Licensed under the Apache License, Version 2.0 (the "License"); you may
+#* not use this file except in compliance with the License.
+#* You may obtain a copy of the License at:
+#*
+#*   http://www.apache.org/licenses/LICENSE-2.0
+#*
+#* Unless required by applicable law or agreed to in writing, software
+#* distributed under the License is distributed on an "AS IS" BASIS,
+#* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#* See the License for the specific language governing permissions and
+#* limitations under the License.
+#*
+#****************************************************************************
+
+package:
+  name: yosys
+  desc: Yosys open synthesis suite tasks for RTL synthesis and formal preparation
+
+  types:
+
+  - name: NetlistFile
+    uses: std.FileSet
+    doc: A synthesized netlist output from Yosys (JSON, Verilog, BLIF, or EDIF format)
+    tags: []
+    with:
+      filetype:
+        type: str
+        value: yosysNetlist
+      format:
+        doc: "Netlist format: json, verilog, blif, edif, or rtlil"
+        type: str
+        value: json
+
+  - name: SMT2File
+    uses: std.FileSet
+    doc: An SMT2 model produced by Yosys for use with formal verification tools
+    tags: []
+    with:
+      filetype:
+        type: str
+        value: yosysSMT2
+
+  - name: LibertyLib
+    uses: std.FileSet
+    doc: A Liberty cell library (.lib) consumed by technology-mapping passes
+    tags: []
+    with:
+      filetype:
+        type: str
+        value: libertyLib
+
+  tasks:
+
+  - name: Synth
+    desc: Technology-independent RTL synthesis
+    doc: |
+      Reads Verilog/SystemVerilog sources and runs the generic `synth` pass,
+      producing an optimized gate-level netlist.  When a liberty cell library
+      is provided (via a `yosys.LibertyLib` or a fileset with filetype
+      `libertyLib`) `dfflibmap` and `abc` are run automatically.
+
+      Outputs a `yosysNetlist` fileset whose format is controlled by the
+      `output_format` parameter.
+
+      Example:
+      ```yaml
+      tasks:
+        - name: rtl
+          uses: std.FileSet
+          with:
+            type: systemVerilogSource
+            include: "src/**/*.sv"
+
+        - name: lib
+          uses: std.FileSet
+          with:
+            type: libertyLib
+            include: "tech/osu035_stdcells.lib"
+
+        - name: synth
+          uses: yosys.Synth
+          needs: [rtl, lib]
+          with:
+            top: my_top
+            output_format: verilog
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.Synth
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    - filetype: libertyLib
+    with:
+      top:
+        doc: Top-level module name (leave empty for auto-detect)
+        type: str
+        value: ""
+      output_format:
+        doc: "Output format: json (default), verilog, blif, edif, rtlil"
+        type: str
+        value: "json"
+      flatten:
+        doc: Flatten the design before synthesis
+        type: bool
+        value: false
+      nofsm:
+        doc: Disable FSM optimization pass
+        type: bool
+        value: false
+      noabc:
+        doc: Disable ABC logic optimization (use Yosys built-in LUT mapper)
+        type: bool
+        value: false
+      retime:
+        doc: Enable flip-flop retiming via ABC
+        type: bool
+        value: false
+      args:
+        doc: Additional yosys script lines appended verbatim after synthesis
+        type: list
+
+  - name: SynthIce40
+    desc: Synthesis targeting Lattice iCE40 FPGAs
+    doc: |
+      Runs `synth_ice40` to produce an iCE40-optimised netlist.  Supports
+      JSON, BLIF, and EDIF output formats.
+
+      Example:
+      ```yaml
+      tasks:
+        - name: rtl
+          uses: std.FileSet
+          with:
+            type: verilogSource
+            include: "src/**/*.v"
+
+        - name: synth
+          uses: yosys.SynthIce40
+          needs: [rtl]
+          with:
+            top: blink
+            device: hx
+            output_format: json
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.SynthIce40
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    with:
+      top:
+        doc: Top-level module name
+        type: str
+        value: ""
+      device:
+        doc: "iCE40 device family: hx (default), lp, u"
+        type: str
+        value: "hx"
+      output_format:
+        doc: "Output format: json (default), blif, edif"
+        type: str
+        value: "json"
+      dff:
+        doc: Run abc/abc9 with -dff option
+        type: bool
+        value: false
+      retime:
+        doc: Enable flip-flop retiming
+        type: bool
+        value: false
+      nocarry:
+        doc: Do not use SB_CARRY cells
+        type: bool
+        value: false
+      nobram:
+        doc: Do not use SB_RAM40_4K* block RAM cells
+        type: bool
+        value: false
+      dsp:
+        doc: Use iCE40 UltraPlus DSP cells for large arithmetic
+        type: bool
+        value: false
+      abc9:
+        doc: Use the newer ABC9 flow (experimental)
+        type: bool
+        value: false
+      args:
+        doc: Additional yosys script lines appended verbatim
+        type: list
+
+  - name: SynthXilinx
+    desc: Synthesis targeting Xilinx FPGAs (7-series, UltraScale, etc.)
+    doc: |
+      Runs `synth_xilinx` for the specified family.  Produces JSON, EDIF,
+      or BLIF output.
+
+      Example:
+      ```yaml
+      tasks:
+        - name: synth
+          uses: yosys.SynthXilinx
+          needs: [rtl]
+          with:
+            top: my_top
+            family: xc7
+            output_format: edif
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.SynthXilinx
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    with:
+      top:
+        doc: Top-level module name
+        type: str
+        value: ""
+      family:
+        doc: "Xilinx device family: xc7 (default), xcup, xcus, xcu"
+        type: str
+        value: "xc7"
+      output_format:
+        doc: "Output format: json (default), edif, blif"
+        type: str
+        value: "json"
+      flatten:
+        doc: Flatten design before synthesis
+        type: bool
+        value: false
+      dff:
+        doc: Run abc/abc9 with -dff option
+        type: bool
+        value: false
+      retime:
+        doc: Enable flip-flop retiming
+        type: bool
+        value: false
+      nobram:
+        doc: Do not use block RAM cells
+        type: bool
+        value: false
+      nodsp:
+        doc: Do not use DSP48* cells
+        type: bool
+        value: false
+      noiopad:
+        doc: Disable I/O buffer insertion (useful for out-of-context flows)
+        type: bool
+        value: false
+      noclkbuf:
+        doc: Disable automatic clock buffer insertion
+        type: bool
+        value: false
+      abc9:
+        doc: Use ABC9 flow (experimental)
+        type: bool
+        value: false
+      args:
+        doc: Additional yosys script lines appended verbatim
+        type: list
+
+  - name: SynthLattice
+    desc: Synthesis targeting Lattice FPGAs (ECP5, MachXO2/3, CrossLink-NX, Certus-NX)
+    doc: |
+      Runs `synth_lattice` for the specified device family.
+
+      Supported families: ecp5, xo2, xo3, xo3d, lifcl, lfd2nx
+
+      Example:
+      ```yaml
+      tasks:
+        - name: synth
+          uses: yosys.SynthLattice
+          needs: [rtl]
+          with:
+            top: my_top
+            family: ecp5
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.SynthLattice
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    with:
+      top:
+        doc: Top-level module name
+        type: str
+        value: ""
+      family:
+        doc: "Lattice device family: ecp5 (default), xo2, xo3, xo3d, lifcl, lfd2nx"
+        type: str
+        value: "ecp5"
+      output_format:
+        doc: "Output format: json (default), edif"
+        type: str
+        value: "json"
+      dff:
+        doc: Run abc with -dff option
+        type: bool
+        value: false
+      retime:
+        doc: Enable flip-flop retiming
+        type: bool
+        value: false
+      args:
+        doc: Additional yosys script lines appended verbatim
+        type: list
+
+  - name: SynthGowin
+    desc: Synthesis targeting Gowin FPGAs (experimental)
+    doc: |
+      Runs `synth_gowin` targeting Gowin FPGA devices.
+
+      Example:
+      ```yaml
+      tasks:
+        - name: synth
+          uses: yosys.SynthGowin
+          needs: [rtl]
+          with:
+            top: my_top
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.SynthGowin
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    with:
+      top:
+        doc: Top-level module name
+        type: str
+        value: ""
+      output_format:
+        doc: "Output format: json (default), verilog"
+        type: str
+        value: "json"
+      args:
+        doc: Additional yosys script lines appended verbatim
+        type: list
+
+  - name: FormalPrepare
+    desc: Prepare RTL for formal verification, producing an SMT2 model
+    doc: |
+      Reads Verilog/SystemVerilog sources (with -formal flag to enable SVA
+      constructs) and runs the standard formal preprocessing pipeline:
+      `hierarchy`, `proc`, `opt`, `memory`, `opt -fast`.  Emits an SMT2
+      model (`write_smt2`) for consumption by sby / smtbmc.
+
+      The output `yosysSMT2` fileset can be consumed by a downstream formal
+      checking task.
+
+      Example:
+      ```yaml
+      tasks:
+        - name: rtl
+          uses: std.FileSet
+          with:
+            type: systemVerilogSource
+            include: "src/**/*.sv"
+
+        - name: model
+          uses: yosys.FormalPrepare
+          needs: [rtl]
+          with:
+            top: my_module
+            bv: true
+            mem: true
+            wires: true
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.FormalPrepare
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    with:
+      top:
+        doc: Top-level module name (leave empty for auto-detect)
+        type: str
+        value: ""
+      bv:
+        doc: Enable bit-vector support in SMT2 output (-bv flag)
+        type: bool
+        value: true
+      mem:
+        doc: Enable memory support in SMT2 output (-mem flag)
+        type: bool
+        value: true
+      wires:
+        doc: Expose internal wire signals in SMT2 output (-wires flag)
+        type: bool
+        value: false
+      args:
+        doc: Additional yosys script lines appended verbatim
+        type: list
+
+  - name: AgentSkill
+    uses: std.AgentSkill
+    doc: |
+      Yosys synthesis agent skill for LLM agent discovery.
+      Covers DV Flow yosys.* task usage, .ys script authoring,
+      log/stat interpretation, and troubleshooting.
+    with:
+      files:
+        value:
+        - share/yosys-synthesis/SKILL.md
+
+  - name: Script
+    desc: Run an arbitrary Yosys script, with optional automatic RTL loading
+    doc: |
+      Executes a user-supplied Yosys script.  When `read_rtl` is true, all
+      RTL sources from upstream filesets are read automatically before the
+      script is executed.
+
+      Example — flatten and dump a design to Verilog:
+      ```yaml
+      tasks:
+        - name: dump
+          uses: yosys.Script
+          needs: [rtl]
+          with:
+            read_rtl: true
+            output_format: verilog
+            script: |
+              synth -flatten
+              write_verilog netlist.verilog
+      ```
+    shell: pytask
+    run: dv_flow.libyosys.synth.Script
+    consumes:
+    - filetype: verilogSource
+    - filetype: systemVerilogSource
+    - filetype: verilogInclude
+    - filetype: systemVerilogInclude
+    - filetype: verilogIncDir
+    - filetype: libertyLib
+    with:
+      script:
+        doc: Yosys script content to execute
+        type: str
+        value: ""
+      read_rtl:
+        doc: Automatically read all upstream RTL sources before the script
+        type: bool
+        value: true
+      top:
+        doc: Top-level module name (used only for output fileset metadata)
+        type: str
+        value: ""
+      output_format:
+        doc: |
+          If set, look for a file named `netlist.<format>` in the run
+          directory after the script completes and expose it as a
+          `yosysNetlist` fileset.
+        type: str
+        value: ""

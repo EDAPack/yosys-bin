@@ -1,0 +1,27 @@
+
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dv-flow-libyosys"
+dynamic = ["version"]
+dependencies = [
+    "dv-flow-mgr",
+]
+authors = [
+    {name = "Matthew Ballance", email = "matt.ballance@gmail.com"},
+]
+description = "DV Flow tasks for Yosys open synthesis suite"
+license = {file = "LICENSE"}
+
+[project.entry-points."dv_flow.mgr"]
+libyosys = "dv_flow.libyosys.__ext__"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"dv_flow.libyosys" = ["flow.dv", "share/**/*"]
+
+[tool.setuptools_scm]

@@ -1,0 +1,16 @@
+package:
+  name: yosys-bin
+
+  # When installed from a release tarball, prepend the bundled yosys binaries
+  # to PATH so downstream tasks can invoke `yosys` directly.
+  env:
+  - name: PATH
+    path-prepend: "${IVPM_PACKAGES}/yosys-bin/bin"
+
+  dep-sets:
+  - name: default-dev
+    deps:
+    - name: dv-flow-mgr
+      url: https://github.com/dv-flow/dv-flow-mgr.git
+    - name: yosys
+      url: https://github.com/YosysHQ/yosys.git

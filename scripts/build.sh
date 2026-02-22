@@ -40,6 +40,20 @@ if test $? -ne 0; then exit 1; fi
 make install PREFIX=${release_dir}
 if test $? -ne 0; then exit 1; fi
 
-cd ${root}/release
 
+# Bundle the dv-flow-libyosys Python package into the release directory so
+# that IVPM can pip-install it from the extracted tarball.
+cp ${proj}/pyproject.toml ${release_dir}/
+cp ${proj}/LICENSE ${release_dir}/
+cp -r ${proj}/src ${release_dir}/
+
+# Build the egg-info so the package metadata is present in the tarball.
+cd ${release_dir}
+pip install --no-build-isolation --no-deps -e . --quiet
+if test $? -ne 0; then exit 1; fi
+
+# Copy the ivpm.yaml so IVPM knows to prepend PATH after extraction.
+cp ${proj}/ivpm.yaml ${release_dir}/
+
+cd ${root}/release
 tar czf yosys-bin-${rls_plat}-${rls_version}.tar.gz yosys-${rls_version}
