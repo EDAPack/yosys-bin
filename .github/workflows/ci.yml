@@ -62,6 +62,6 @@ jobs:
                 BUILD_NUM: ${{ github.run_id }}
               with:
                 upload_url: ${{ steps.create_release.outputs.upload_url }}
-                asset_path: "./release/yosys-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
-                asset_name: "yosys-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
+                asset_path: "./release/yosys-bin-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
+                asset_name: "yosys-bin-manylinux-x64-${{ steps.is_needed.outputs.yosys_version }}.tar.gz"
                 asset_content_type: application/gzip

@@ -42,4 +42,4 @@ if test $? -ne 0; then exit 1; fi
 
 cd ${root}/release
 
-tar czf yosys-${rls_plat}-${rls_version}.tar.gz yosys-${rls_version}
+tar czf yosys-bin-${rls_plat}-${rls_version}.tar.gz yosys-${rls_version}
