@@ -82,7 +82,9 @@ cp -r ${proj}/src ${release_dir}/
 # Build the egg-info so the package metadata is present in the tarball.
 cd ${release_dir}
 pip install setuptools setuptools-scm --quiet
-SETUPTOOLS_SCM_PRETEND_VERSION=${rls_version} pip install --no-build-isolation --no-deps -e . --quiet
+# Strip any non-numeric prefix (e.g. "yosys-") to get a PEP 440 compatible version
+pip_version=$(echo ${rls_version} | sed -e 's/^[^0-9]*//')
+SETUPTOOLS_SCM_PRETEND_VERSION=${pip_version} pip install --no-build-isolation --no-deps -e . --quiet
 if test $? -ne 0; then exit 1; fi
 
 # Copy the ivpm.yaml so IVPM knows to prepend PATH after extraction.
