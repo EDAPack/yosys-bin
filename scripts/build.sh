@@ -54,7 +54,7 @@ cd ${proj}/boolector
 if test $? -ne 0; then exit 1; fi
 ./contrib/setup-btor2tools.sh
 if test $? -ne 0; then exit 1; fi
-./configure.sh
+./configure.sh -- -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 if test $? -ne 0; then exit 1; fi
 cd build
 make -j$(nproc)
