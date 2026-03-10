@@ -5,7 +5,7 @@ root=$(pwd)
 if test "x${CI_BUILD}" != "x"; then
     if test $(uname -s) = "Linux"; then
         dnf update -y
-        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake
+        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static
         export PATH=/opt/python/cp312-cp312/bin:$PATH
         rls_plat="manylinux-x64"
     elif test $(uname -s) = "Windows"; then
@@ -55,7 +55,7 @@ cd ${proj}/boolector
 mkdir -p ${proj}/cmake-wrapper
 cat > ${proj}/cmake-wrapper/cmake << 'CMAKEWRAP'
 #!/bin/sh
-exec /usr/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"
+exec /usr/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64" "$@"
 CMAKEWRAP
 chmod +x ${proj}/cmake-wrapper/cmake
 export PATH=${proj}/cmake-wrapper:${PATH}
