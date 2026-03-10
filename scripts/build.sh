@@ -50,11 +50,20 @@ if test ! -d boolector; then
     if test $? -ne 0; then exit 1; fi
 fi
 cd ${proj}/boolector
+# Create a cmake wrapper that injects CMAKE_POLICY_VERSION_MINIMUM=3.5 so that
+# btor2tools (which has an old cmake_minimum_required) builds on modern CMake.
+mkdir -p ${proj}/cmake-wrapper
+cat > ${proj}/cmake-wrapper/cmake << 'CMAKEWRAP'
+#!/bin/sh
+exec /usr/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 "$@"
+CMAKEWRAP
+chmod +x ${proj}/cmake-wrapper/cmake
+export PATH=${proj}/cmake-wrapper:${PATH}
 ./contrib/setup-lingeling.sh
 if test $? -ne 0; then exit 1; fi
 ./contrib/setup-btor2tools.sh
 if test $? -ne 0; then exit 1; fi
-./configure.sh -- -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+./configure.sh
 if test $? -ne 0; then exit 1; fi
 cd build
 make -j$(nproc)
