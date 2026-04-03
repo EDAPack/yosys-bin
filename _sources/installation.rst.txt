@@ -32,7 +32,8 @@ directly in their project's ``ivpm.yaml``::
         - name: default-dev
           deps:
             - name: yosys-bin
-              url: https://github.com/EDAPack/yosys-bin.git
+              src: gh-rls
+              url: https://github.com/EDAPack/yosys-bin
 
 Then run::
 
