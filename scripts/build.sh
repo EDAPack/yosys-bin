@@ -175,6 +175,11 @@ chmod +x ${release_dir}/bin/*
 # slang.so has no external shared-library dependencies beyond what yosys itself
 # requires.  C++20 is needed; the manylinux_2_34 default GCC (11+) is sufficient.
 echo "=== Building yosys-slang ==="
+if test ! -d ${proj}/yosys-slang; then
+    git clone https://github.com/povik/yosys-slang ${proj}/yosys-slang
+    if test $? -ne 0; then exit 1; fi
+fi
+git config --global --add safe.directory ${proj}
 git config --global --add safe.directory ${proj}/yosys-slang
 git config --global --add safe.directory ${proj}/yosys-slang/third_party/slang
 git config --global --add safe.directory ${proj}/yosys-slang/third_party/fmt
