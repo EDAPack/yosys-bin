@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>DV Flow Task Reference &#8212; yosys-bin  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=fd6eb6e6"></script>
+    <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Building from Source" href="building.html" />
+    <link rel="prev" title="Components" href="components.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="dv-flow-task-reference">
+<h1>DV Flow Task Reference<a class="headerlink" href="#dv-flow-task-reference" title="Link to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">dv_flow.libyosys</span></code> package registers tasks under the <code class="docutils literal notranslate"><span class="pre">yosys</span></code>
+namespace for use in <a class="reference external" href="https://dv-flow.github.io/">DV Flow</a> <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code>
+files.</p>
+<section id="file-types">
+<h2>File types<a class="headerlink" href="#file-types" title="Link to this heading">¶</a></h2>
+<section id="yosys-netlistfile">
+<h3><code class="docutils literal notranslate"><span class="pre">yosys.NetlistFile</span></code><a class="headerlink" href="#yosys-netlistfile" title="Link to this heading">¶</a></h3>
+<p>A synthesized netlist produced by Yosys.  Supported formats: JSON, Verilog
+(<code class="docutils literal notranslate"><span class="pre">write_verilog</span></code>), BLIF, EDIF, or RTLIL.  This fileset type is produced by
+the synthesis tasks below and consumed by downstream place-and-route tools.</p>
+</section>
+<section id="yosys-smt2file">
+<h3><code class="docutils literal notranslate"><span class="pre">yosys.SMT2File</span></code><a class="headerlink" href="#yosys-smt2file" title="Link to this heading">¶</a></h3>
+<p>An SMT2 model produced by <code class="docutils literal notranslate"><span class="pre">write_smt2</span></code>, for use with formal verification
+back-ends such as <code class="docutils literal notranslate"><span class="pre">smtbmc</span></code> / SymbiYosys.</p>
+</section>
+<section id="yosys-libertylib">
+<h3><code class="docutils literal notranslate"><span class="pre">yosys.LibertyLib</span></code><a class="headerlink" href="#yosys-libertylib" title="Link to this heading">¶</a></h3>
+<p>A Liberty <code class="docutils literal notranslate"><span class="pre">.lib</span></code> cell library consumed by technology-mapping passes
+(<code class="docutils literal notranslate"><span class="pre">dfflibmap</span></code> / <code class="docutils literal notranslate"><span class="pre">abc</span></code>).  Pass one of these as an input to <code class="docutils literal notranslate"><span class="pre">yosys.Synth</span></code>
+to enable standard-cell mapping.</p>
+</section>
+</section>
+<section id="synthesis-tasks">
+<h2>Synthesis tasks<a class="headerlink" href="#synthesis-tasks" title="Link to this heading">¶</a></h2>
+<section id="yosys-synth">
+<span id="task-synth"></span><h3>yosys.Synth<a class="headerlink" href="#yosys-synth" title="Link to this heading">¶</a></h3>
+<p><em>Technology-independent RTL synthesis.</em></p>
+<p>Reads Verilog/SystemVerilog sources and runs the generic <code class="docutils literal notranslate"><span class="pre">synth</span></code> pass,
+producing an optimised gate-level netlist.  When a Liberty cell library is
+provided (via a <code class="docutils literal notranslate"><span class="pre">yosys.LibertyLib</span></code> fileset) <code class="docutils literal notranslate"><span class="pre">dfflibmap</span></code> and <code class="docutils literal notranslate"><span class="pre">abc</span></code> are
+run automatically.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="nt">tasks</span><span class="p">:</span>
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">      </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src/**/*.sv&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">lib</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">libertyLib</span>
+<span class="w">      </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;tech/osu035_stdcells.lib&quot;</span>
+
+<span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">    </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.Synth</span>
+<span class="w">    </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">lib</span><span class="p p-Indicator">]</span>
+<span class="w">    </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">      </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_top</span>
+<span class="w">      </span><span class="nt">output_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">verilog</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name (leave empty for auto-detect).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">output_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Output format: <code class="docutils literal notranslate"><span class="pre">json</span></code> (default), <code class="docutils literal notranslate"><span class="pre">verilog</span></code>, <code class="docutils literal notranslate"><span class="pre">blif</span></code>, <code class="docutils literal notranslate"><span class="pre">edif</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rtlil</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">flatten</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Flatten the design before synthesis.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nofsm</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Disable FSM optimisation pass.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">noabc</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Disable ABC logic optimisation (use Yosys built-in LUT mapper).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">retime</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable flip-flop retiming via ABC.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim after synthesis.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="yosys-synthice40">
+<span id="task-synthice40"></span><h3>yosys.SynthIce40<a class="headerlink" href="#yosys-synthice40" title="Link to this heading">¶</a></h3>
+<p><em>Synthesis targeting Lattice iCE40 FPGAs.</em></p>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">synth_ice40</span></code> to produce an iCE40-optimised netlist.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.SynthIce40</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">blink</span>
+<span class="w">    </span><span class="nt">family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">hx</span>
+<span class="w">    </span><span class="nt">output_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">json</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">family</span></code></p></td>
+<td><p>str</p></td>
+<td><p>iCE40 device family: <code class="docutils literal notranslate"><span class="pre">hx</span></code> (default), <code class="docutils literal notranslate"><span class="pre">lp</span></code>, <code class="docutils literal notranslate"><span class="pre">u</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">output_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Output format: <code class="docutils literal notranslate"><span class="pre">json</span></code> (default), <code class="docutils literal notranslate"><span class="pre">blif</span></code>, <code class="docutils literal notranslate"><span class="pre">edif</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">retime</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable flip-flop retiming.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">abc9</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Use the newer ABC9 flow (experimental).</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="yosys-synthxilinx">
+<span id="task-synthxilinx"></span><h3>yosys.SynthXilinx<a class="headerlink" href="#yosys-synthxilinx" title="Link to this heading">¶</a></h3>
+<p><em>Synthesis targeting Xilinx FPGAs (7-series, UltraScale, etc.)</em></p>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">synth_xilinx</span></code> for the specified family.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.SynthXilinx</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_top</span>
+<span class="w">    </span><span class="nt">family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">xc7</span>
+<span class="w">    </span><span class="nt">output_format</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">edif</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">family</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Xilinx device family: <code class="docutils literal notranslate"><span class="pre">xc7</span></code> (default), <code class="docutils literal notranslate"><span class="pre">xcup</span></code>, <code class="docutils literal notranslate"><span class="pre">xcus</span></code>, <code class="docutils literal notranslate"><span class="pre">xcu</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">output_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Output format: <code class="docutils literal notranslate"><span class="pre">json</span></code> (default), <code class="docutils literal notranslate"><span class="pre">edif</span></code>, <code class="docutils literal notranslate"><span class="pre">blif</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">flatten</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Flatten design before synthesis.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">retime</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Enable flip-flop retiming.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nobram</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Do not use block RAM cells.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nodsp</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Do not use DSP48* cells.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="yosys-synthlattice">
+<span id="task-synthlattice"></span><h3>yosys.SynthLattice<a class="headerlink" href="#yosys-synthlattice" title="Link to this heading">¶</a></h3>
+<p><em>Synthesis targeting Lattice FPGAs (ECP5, MachXO2/3, CrossLink-NX, Certus-NX).</em></p>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">synth_lattice</span></code> for the specified device family.</p>
+<p>Supported families: <code class="docutils literal notranslate"><span class="pre">ecp5</span></code>, <code class="docutils literal notranslate"><span class="pre">xo2</span></code>, <code class="docutils literal notranslate"><span class="pre">xo3</span></code>, <code class="docutils literal notranslate"><span class="pre">xo3d</span></code>, <code class="docutils literal notranslate"><span class="pre">lifcl</span></code>, <code class="docutils literal notranslate"><span class="pre">lfd2nx</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.SynthLattice</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_top</span>
+<span class="w">    </span><span class="nt">family</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ecp5</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">family</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Lattice device family (see supported list above).</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">output_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Output format: <code class="docutils literal notranslate"><span class="pre">json</span></code> (default), <code class="docutils literal notranslate"><span class="pre">blif</span></code>, <code class="docutils literal notranslate"><span class="pre">edif</span></code>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="yosys-synthgowin">
+<span id="task-synthgowin"></span><h3>yosys.SynthGowin<a class="headerlink" href="#yosys-synthgowin" title="Link to this heading">¶</a></h3>
+<p><em>Synthesis targeting Gowin FPGAs (experimental).</em></p>
+<p>Runs <code class="docutils literal notranslate"><span class="pre">synth_gowin</span></code>.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.SynthGowin</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_top</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">output_format</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Output format: <code class="docutils literal notranslate"><span class="pre">json</span></code> (default), <code class="docutils literal notranslate"><span class="pre">blif</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="formal-verification">
+<h2>Formal verification<a class="headerlink" href="#formal-verification" title="Link to this heading">¶</a></h2>
+<section id="yosys-formalprepare">
+<span id="task-formalprepare"></span><h3>yosys.FormalPrepare<a class="headerlink" href="#yosys-formalprepare" title="Link to this heading">¶</a></h3>
+<p><em>Prepare RTL for formal verification, producing an SMT2 model.</em></p>
+<p>Reads Verilog/SystemVerilog sources with the <code class="docutils literal notranslate"><span class="pre">-formal</span></code> flag (enabling SVA
+constructs) and runs the standard formal preprocessing pipeline:
+<code class="docutils literal notranslate"><span class="pre">hierarchy</span></code>, <code class="docutils literal notranslate"><span class="pre">proc</span></code>, <code class="docutils literal notranslate"><span class="pre">opt</span></code>, <code class="docutils literal notranslate"><span class="pre">memory</span></code>, <code class="docutils literal notranslate"><span class="pre">opt</span> <span class="pre">-fast</span></code>.  Emits an SMT2
+model (<code class="docutils literal notranslate"><span class="pre">write_smt2</span></code>) for consumption by <code class="docutils literal notranslate"><span class="pre">smtbmc</span></code> / SymbiYosys.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">rtl</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">std.FileSet</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">type</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">systemVerilogSource</span>
+<span class="w">    </span><span class="nt">include</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;src/**/*.sv&quot;</span>
+
+<span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">prepare</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.FormalPrepare</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">top</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">my_module</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">top</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Top-level module name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+<section id="utility-tasks">
+<h2>Utility tasks<a class="headerlink" href="#utility-tasks" title="Link to this heading">¶</a></h2>
+<section id="yosys-script">
+<h3>yosys.Script<a class="headerlink" href="#yosys-script" title="Link to this heading">¶</a></h3>
+<p><em>Run an arbitrary Yosys script, with optional automatic RTL loading.</em></p>
+<p>Executes a user-supplied Yosys script.  When <code class="docutils literal notranslate"><span class="pre">read_rtl</span></code> is <code class="docutils literal notranslate"><span class="pre">true</span></code>, all
+RTL sources from upstream filesets are read automatically before the script
+runs.</p>
+<div class="highlight-yaml notranslate"><div class="highlight"><pre><span></span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">name</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">synth</span>
+<span class="w">  </span><span class="nt">uses</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">yosys.Script</span>
+<span class="w">  </span><span class="nt">needs</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">rtl</span><span class="p p-Indicator">]</span>
+<span class="w">  </span><span class="nt">with</span><span class="p">:</span>
+<span class="w">    </span><span class="nt">script</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;synth.ys&quot;</span>
+<span class="w">    </span><span class="nt">read_rtl</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">true</span>
+</pre></div>
+</div>
+<p><strong>Parameters</strong></p>
+<table class="docutils align-default">
+<colgroup>
+<col style="width: 20.0%" />
+<col style="width: 10.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Name</p></th>
+<th class="head"><p>Type</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">script</span></code></p></td>
+<td><p>str</p></td>
+<td><p>Path to the <code class="docutils literal notranslate"><span class="pre">.ys</span></code> script file to execute.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">read_rtl</span></code></p></td>
+<td><p>bool</p></td>
+<td><p>Automatically read all upstream RTL sources before running the script.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">args</span></code></p></td>
+<td><p>list</p></td>
+<td><p>Additional Yosys script lines appended verbatim after the script.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">yosys-bin</a></h1>
+
+
+
+<p class="blurb">Portable Yosys binary distribution with Python bindings</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=EDAPack&repo=yosys-bin&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="components.html">Components</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">DV Flow Task Reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#file-types">File types</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#synthesis-tasks">Synthesis tasks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#formal-verification">Formal verification</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#utility-tasks">Utility tasks</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building from Source</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="components.html" title="previous chapter">Components</a></li>
+      <li>Next: <a href="building.html" title="next chapter">Building from Source</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023-2025, Matthew Ballance and Contributors.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.0.4</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/dvflow.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+    <a href="https://github.com/EDAPack/yosys-bin" class="github">
+        <img src="_static/github-banner.svg" alt="Fork me on GitHub" class="github"/>
+    </a>
+    
+
+    
+  </body>
+</html>
