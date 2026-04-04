@@ -249,6 +249,7 @@ sed "s/%%VERSION%%/${pip_version}/" \
 
 cp ${proj}/LICENSE ${release_dir}/
 cp ${proj}/ivpm.yaml ${release_dir}/
+cp ${proj}/scripts/export.envrc ${release_dir}/
 
 # Pre-generate egg-info so package metadata is present in the tarball.
 cd ${release_dir}
