@@ -97,6 +97,95 @@ Typical usage with SymbiYosys / smtbmc::
 Or use the DV Flow :ref:`FormalPrepare <task-formalprepare>` task to drive
 the full flow from a ``flow.dv`` description.
 
+sby — SymbiYosys
+----------------
+
+`SymbiYosys (sby) <https://yosyshq.net/sby/>`_ is a front-end driver for
+Yosys-based formal hardware verification flows.  It reads a ``.sby``
+configuration file that describes the design sources, the verification engine
+to use (e.g. ``smtbmc``, ``aiger``, ``abc``), and the properties to check
+(BMC, k-induction, cover), then orchestrates Yosys and the chosen solver.
+
+Installed files::
+
+    bin/sby
+    share/yosys/python3/sby_*.py   – sby support library
+
+Example ``.sby`` file::
+
+    [options]
+    mode bmc
+    depth 20
+
+    [engines]
+    smtbmc boolector
+
+    [script]
+    read -formal my_design.sv
+    prep -top my_top
+
+    [files]
+    my_design.sv
+
+Run with::
+
+    sby -f my_design.sby
+
+mcy — Mutation Cover with Yosys
+--------------------------------
+
+`mcy <https://yosyshq.net/mcy/>`_ measures the quality of a formal
+verification test suite by injecting mutations into a design and checking how
+many are caught by the existing properties.  It produces a coverage report
+showing which parts of the design are exercised by the formal tests.
+
+Installed files::
+
+    bin/mcy
+    bin/mcy-dash
+    share/mcy/scripts/   – helper scripts used internally by mcy
+    share/mcy/dash/      – web dashboard assets for mcy-dash
+
+Basic usage::
+
+    mcy init          # create mcy.cfg template
+    mcy run -j4       # run mutation checks with 4 parallel workers
+    mcy dash          # start web dashboard on http://localhost:5000
+
+eqy — Equivalence Check with Yosys
+------------------------------------
+
+`eqy <https://yosyshq.net/eqy/>`_ performs combinational and sequential
+equivalence checking between two netlists using Yosys.  It is useful for
+verifying that synthesis, retiming, or other transformations preserve circuit
+behaviour.
+
+Installed files::
+
+    bin/eqy
+    share/yosys/python3/eqy_job.py
+    share/yosys/plugins/eqy_combine.so
+    share/yosys/plugins/eqy_partition.so
+    share/yosys/plugins/eqy_recode.so
+
+Example ``.eqy`` file::
+
+    [gold]
+    read -sv gold.sv
+    prep -top top
+
+    [gate]
+    read -sv gate.sv
+    prep -top top
+
+    [strategy simple]
+    use sat
+    depth 10
+
+Run with::
+
+    eqy -f my_check.eqy
+
 dv-flow-libyosys
 ----------------
 

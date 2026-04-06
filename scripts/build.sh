@@ -233,6 +233,67 @@ cp bin/boolector ${release_dir}/bin/
 chmod +x ${release_dir}/bin/boolector
 cd ${proj}
 
+# ── sby (SymbiYosys) ──────────────────────────────────────────────────────────
+# sby is a formal verification front-end for Yosys.  It is pure Python so no
+# compilation is needed; make install copies the Python scripts and the launcher.
+echo "=== Installing sby ==="
+if test -d ${proj}/packages/sby; then
+    sby_src=${proj}/packages/sby
+elif test ! -d ${proj}/sby; then
+    git clone https://github.com/YosysHQ/sby ${proj}/sby
+    if test $? -ne 0; then exit 1; fi
+    sby_src=${proj}/sby
+else
+    sby_src=${proj}/sby
+fi
+git config --global --add safe.directory ${sby_src}
+cd ${sby_src}
+make install PREFIX=${release_dir}
+if test $? -ne 0; then exit 1; fi
+cd ${proj}
+
+# ── mcy (Mutation Cover with Yosys) ──────────────────────────────────────────
+# mcy is pure Python (plus an optional Qt GUI which we skip here because the
+# build container does not have Qt installed).  Install scripts manually.
+echo "=== Installing mcy ==="
+if test -d ${proj}/packages/mcy; then
+    mcy_src=${proj}/packages/mcy
+elif test ! -d ${proj}/mcy; then
+    git clone https://github.com/YosysHQ/mcy ${proj}/mcy
+    if test $? -ne 0; then exit 1; fi
+    mcy_src=${proj}/mcy
+else
+    mcy_src=${proj}/mcy
+fi
+git config --global --add safe.directory ${mcy_src}
+mkdir -p ${release_dir}/bin
+install ${mcy_src}/mcy.py ${release_dir}/bin/mcy
+install ${mcy_src}/mcy-dash.py ${release_dir}/bin/mcy-dash
+mkdir -p ${release_dir}/share/mcy/dash
+cp -r ${mcy_src}/dash/. ${release_dir}/share/mcy/dash/.
+mkdir -p ${release_dir}/share/mcy/scripts
+cp -r ${mcy_src}/scripts/. ${release_dir}/share/mcy/scripts/.
+cd ${proj}
+
+# ── eqy (Equivalence Check with Yosys) ───────────────────────────────────────
+# eqy ships three Yosys plugins (.so) that must be compiled against the already-
+# installed yosys headers via yosys-config --build.
+echo "=== Building and installing eqy ==="
+if test -d ${proj}/packages/eqy; then
+    eqy_src=${proj}/packages/eqy
+elif test ! -d ${proj}/eqy; then
+    git clone https://github.com/YosysHQ/eqy ${proj}/eqy
+    if test $? -ne 0; then exit 1; fi
+    eqy_src=${proj}/eqy
+else
+    eqy_src=${proj}/eqy
+fi
+git config --global --add safe.directory ${eqy_src}
+cd ${eqy_src}
+make install PREFIX=${release_dir} YOSYS_CONFIG=${release_dir}/bin/yosys-config
+if test $? -ne 0; then exit 1; fi
+cd ${proj}
+
 # Flat-layout Python package setup.
 # dv_flow/ goes directly at the release root (not under src/) so that
 # PYTHONPATH=<release_dir> and pip install -e <release_dir> both work
