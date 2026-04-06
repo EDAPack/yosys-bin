@@ -121,6 +121,92 @@ Yosys formal verification flows to discharge proof obligations produced by
 <p>Or use the DV Flow <a class="reference internal" href="dvflow.html#task-formalprepare"><span class="std std-ref">FormalPrepare</span></a> task to drive
 the full flow from a <code class="docutils literal notranslate"><span class="pre">flow.dv</span></code> description.</p>
 </section>
+<section id="sby-symbiyosys">
+<h2>sby — SymbiYosys<a class="headerlink" href="#sby-symbiyosys" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://yosyshq.net/sby/">SymbiYosys (sby)</a> is a front-end driver for
+Yosys-based formal hardware verification flows.  It reads a <code class="docutils literal notranslate"><span class="pre">.sby</span></code>
+configuration file that describes the design sources, the verification engine
+to use (e.g. <code class="docutils literal notranslate"><span class="pre">smtbmc</span></code>, <code class="docutils literal notranslate"><span class="pre">aiger</span></code>, <code class="docutils literal notranslate"><span class="pre">abc</span></code>), and the properties to check
+(BMC, k-induction, cover), then orchestrates Yosys and the chosen solver.</p>
+<p>Installed files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>bin/sby
+share/yosys/python3/sby_*.py   – sby support library
+</pre></div>
+</div>
+<p>Example <code class="docutils literal notranslate"><span class="pre">.sby</span></code> file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">options</span><span class="p">]</span>
+<span class="n">mode</span> <span class="n">bmc</span>
+<span class="n">depth</span> <span class="mi">20</span>
+
+<span class="p">[</span><span class="n">engines</span><span class="p">]</span>
+<span class="n">smtbmc</span> <span class="n">boolector</span>
+
+<span class="p">[</span><span class="n">script</span><span class="p">]</span>
+<span class="n">read</span> <span class="o">-</span><span class="n">formal</span> <span class="n">my_design</span><span class="o">.</span><span class="n">sv</span>
+<span class="n">prep</span> <span class="o">-</span><span class="n">top</span> <span class="n">my_top</span>
+
+<span class="p">[</span><span class="n">files</span><span class="p">]</span>
+<span class="n">my_design</span><span class="o">.</span><span class="n">sv</span>
+</pre></div>
+</div>
+<p>Run with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">sby</span> <span class="o">-</span><span class="n">f</span> <span class="n">my_design</span><span class="o">.</span><span class="n">sby</span>
+</pre></div>
+</div>
+</section>
+<section id="mcy-mutation-cover-with-yosys">
+<h2>mcy — Mutation Cover with Yosys<a class="headerlink" href="#mcy-mutation-cover-with-yosys" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://yosyshq.net/mcy/">mcy</a> measures the quality of a formal
+verification test suite by injecting mutations into a design and checking how
+many are caught by the existing properties.  It produces a coverage report
+showing which parts of the design are exercised by the formal tests.</p>
+<p>Installed files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>bin/mcy
+bin/mcy-dash
+share/mcy/scripts/   – helper scripts used internally by mcy
+share/mcy/dash/      – web dashboard assets for mcy-dash
+</pre></div>
+</div>
+<p>Basic usage:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">mcy</span> <span class="n">init</span>          <span class="c1"># create mcy.cfg template</span>
+<span class="n">mcy</span> <span class="n">run</span> <span class="o">-</span><span class="n">j4</span>       <span class="c1"># run mutation checks with 4 parallel workers</span>
+<span class="n">mcy</span> <span class="n">dash</span>          <span class="c1"># start web dashboard on http://localhost:5000</span>
+</pre></div>
+</div>
+</section>
+<section id="eqy-equivalence-check-with-yosys">
+<h2>eqy — Equivalence Check with Yosys<a class="headerlink" href="#eqy-equivalence-check-with-yosys" title="Link to this heading">¶</a></h2>
+<p><a class="reference external" href="https://yosyshq.net/eqy/">eqy</a> performs combinational and sequential
+equivalence checking between two netlists using Yosys.  It is useful for
+verifying that synthesis, retiming, or other transformations preserve circuit
+behaviour.</p>
+<p>Installed files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="nb">bin</span><span class="o">/</span><span class="n">eqy</span>
+<span class="n">share</span><span class="o">/</span><span class="n">yosys</span><span class="o">/</span><span class="n">python3</span><span class="o">/</span><span class="n">eqy_job</span><span class="o">.</span><span class="n">py</span>
+<span class="n">share</span><span class="o">/</span><span class="n">yosys</span><span class="o">/</span><span class="n">plugins</span><span class="o">/</span><span class="n">eqy_combine</span><span class="o">.</span><span class="n">so</span>
+<span class="n">share</span><span class="o">/</span><span class="n">yosys</span><span class="o">/</span><span class="n">plugins</span><span class="o">/</span><span class="n">eqy_partition</span><span class="o">.</span><span class="n">so</span>
+<span class="n">share</span><span class="o">/</span><span class="n">yosys</span><span class="o">/</span><span class="n">plugins</span><span class="o">/</span><span class="n">eqy_recode</span><span class="o">.</span><span class="n">so</span>
+</pre></div>
+</div>
+<p>Example <code class="docutils literal notranslate"><span class="pre">.eqy</span></code> file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">[</span><span class="n">gold</span><span class="p">]</span>
+<span class="n">read</span> <span class="o">-</span><span class="n">sv</span> <span class="n">gold</span><span class="o">.</span><span class="n">sv</span>
+<span class="n">prep</span> <span class="o">-</span><span class="n">top</span> <span class="n">top</span>
+
+<span class="p">[</span><span class="n">gate</span><span class="p">]</span>
+<span class="n">read</span> <span class="o">-</span><span class="n">sv</span> <span class="n">gate</span><span class="o">.</span><span class="n">sv</span>
+<span class="n">prep</span> <span class="o">-</span><span class="n">top</span> <span class="n">top</span>
+
+<span class="p">[</span><span class="n">strategy</span> <span class="n">simple</span><span class="p">]</span>
+<span class="n">use</span> <span class="n">sat</span>
+<span class="n">depth</span> <span class="mi">10</span>
+</pre></div>
+</div>
+<p>Run with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">eqy</span> <span class="o">-</span><span class="n">f</span> <span class="n">my_check</span><span class="o">.</span><span class="n">eqy</span>
+</pre></div>
+</div>
+</section>
 <section id="dv-flow-libyosys">
 <h2>dv-flow-libyosys<a class="headerlink" href="#dv-flow-libyosys" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">dv-flow-libyosys</span></code> (Python package <code class="docutils literal notranslate"><span class="pre">dv_flow.libyosys</span></code>) integrates Yosys
@@ -175,6 +261,9 @@ into a larger EDA pipeline described in a <code class="docutils literal notransl
 <li class="toctree-l2"><a class="reference internal" href="#pyosys-python-bindings">pyosys — Python Bindings</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#yosys-slang-plugin">yosys-slang Plugin</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#boolector-smt-solver">Boolector SMT Solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sby-symbiyosys">sby — SymbiYosys</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#mcy-mutation-cover-with-yosys">mcy — Mutation Cover with Yosys</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#eqy-equivalence-check-with-yosys">eqy — Equivalence Check with Yosys</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#dv-flow-libyosys">dv-flow-libyosys</a></li>
 </ul>
 </li>

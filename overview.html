@@ -51,6 +51,9 @@ Debian 12+, Fedora 37+, …).</p></li>
 <a class="reference external" href="https://sv-lang.com/">LLVM/slang</a>.</p></li>
 <li><p>Include the <a class="reference external" href="https://boolector.github.io/">Boolector</a> SMT solver for
 use with Yosys formal verification flows.</p></li>
+<li><p>Include <a class="reference external" href="https://yosyshq.net/sby/">sby (SymbiYosys)</a> for formal
+verification, <a class="reference external" href="https://yosyshq.net/mcy/">mcy</a> for mutation coverage
+analysis, and <a class="reference external" href="https://yosyshq.net/eqy/">eqy</a> for equivalence checking.</p></li>
 <li><p>Integrate with the <a class="reference external" href="https://dv-flow.github.io/">DV Flow</a> task framework
 via the <code class="docutils literal notranslate"><span class="pre">dv-flow-libyosys</span></code> package (<code class="docutils literal notranslate"><span class="pre">dv_flow.libyosys</span></code>).</p></li>
 </ul>
@@ -80,7 +83,16 @@ via the <code class="docutils literal notranslate"><span class="pre">dv-flow-lib
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">boolector</span></code></p></td>
 <td><p>Boolector SMT solver binary (used by <code class="docutils literal notranslate"><span class="pre">write_smt2</span></code> / <code class="docutils literal notranslate"><span class="pre">smtbmc</span></code> flows)</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">dv-flow-libyosys</span></code></p></td>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sby</span></code> (SymbiYosys)</p></td>
+<td><p>Formal verification front-end: BMC, k-induction, and cover analysis</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">mcy</span></code></p></td>
+<td><p>Mutation coverage analysis tool for formal verification test suites</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">eqy</span></code></p></td>
+<td><p>Equivalence checking tool and Yosys plugins (<code class="docutils literal notranslate"><span class="pre">eqy_combine.so</span></code>, etc.)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dv-flow-libyosys</span></code></p></td>
 <td><p>DV Flow task library: <code class="docutils literal notranslate"><span class="pre">yosys.Synth</span></code>, <code class="docutils literal notranslate"><span class="pre">yosys.FormalPrepare</span></code>, etc.</p></td>
 </tr>
 </tbody>
