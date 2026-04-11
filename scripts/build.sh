@@ -5,7 +5,7 @@ root=$(pwd)
 if test "x${CI_BUILD}" != "x"; then
     if test $(uname -s) = "Linux"; then
         dnf update -y
-        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++
+        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf
         # Use Python 3.10 as the base build interpreter (minimum supported version).
         # Per-version libyosys.cpython-3XX-*.so files are built in a loop below.
         export PATH=/opt/python/cp310-cp310/bin:$PATH
@@ -293,6 +293,84 @@ cd ${eqy_src}
 make install PREFIX=${release_dir} YOSYS_CONFIG=${release_dir}/bin/yosys-config
 if test $? -ne 0; then exit 1; fi
 cd ${proj}
+
+# ── Bundle non-guaranteed shared libraries ────────────────────────────────────
+# The release must be self-contained: any library that is not part of the base
+# OS on every supported target (glibc 2.34+ / manylinux_2_34) is copied into
+# lib/ and the ELFs that need it are patched with an $ORIGIN-relative RPATH so
+# the dynamic linker finds the bundled copy first.
+#
+# Libraries bundled here and why they are not "nearly-guaranteed":
+#   libcrypt.so.2  – provided by libxcrypt; absent by default on Ubuntu 22.04+
+#                    and many other non-RHEL distros (they ship only .so.1)
+#   libreadline.so.8 – readline 8; not always installed (some systems have 7)
+#   libffi.so.8    – libffi 3.4; not always installed on non-devel systems
+#   libtcl8.6.so   – Tcl 8.6; not always installed
+#   libtinfo.so.6  – ncurses 6 (terminal DB); not always present separately
+#
+# Libraries intentionally NOT bundled (present on every glibc 2.34+ system):
+#   libc, libm, libgcc_s, libstdc++ (guaranteed by manylinux ABI), libz
+echo "=== Bundling non-guaranteed shared libraries ==="
+mkdir -p ${release_dir}/lib
+
+bundle_lib() {
+    # bundle_lib <soname>  – copy the real file (resolving symlinks) and create
+    # a soname symlink in ${release_dir}/lib/ if the library is found.
+    soname="$1"
+    found=$(ldconfig -p 2>/dev/null | grep " ${soname} " | awk '{print $NF}' | head -1)
+    if test -z "${found}"; then
+        found=$(find /lib64 /usr/lib64 /lib /usr/lib -name "${soname}" 2>/dev/null | head -1)
+    fi
+    if test -n "${found}"; then
+        # Copy the real file (dereference symlinks so we get the actual .so.X.Y.Z)
+        real=$(readlink -f "${found}")
+        cp "${real}" ${release_dir}/lib/
+        realname=$(basename "${real}")
+        # Create soname symlink if the real name differs (e.g. libcrypt.so.2.0.0 → libcrypt.so.2)
+        if test "${realname}" != "${soname}"; then
+            ln -sf "${realname}" ${release_dir}/lib/${soname}
+        fi
+        echo "  Bundled ${soname} (${real})"
+        return 0
+    else
+        echo "  WARNING: ${soname} not found in build environment – skipping"
+        return 1
+    fi
+}
+
+for soname in libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6; do
+    bundle_lib "${soname}"
+done
+
+# Patch RPATH on every installed ELF that links one of the bundled libraries.
+# We add $ORIGIN-relative paths so the binary finds lib/ regardless of where
+# the release tree is installed.
+patch_rpath() {
+    elf="$1"
+    rpath="$2"
+    if ! file "${elf}" 2>/dev/null | grep -q ELF; then return; fi
+    if ldd "${elf}" 2>/dev/null | grep -qE 'libcrypt\.so\.2|libreadline\.so\.8|libffi\.so\.8|libtcl8\.6\.so|libtinfo\.so\.6'; then
+        patchelf --add-rpath "${rpath}" "${elf}"
+        echo "  RPATH '${rpath}' -> ${elf#${release_dir}/}"
+    fi
+}
+
+# bin/* and pyosys/*.so are one level below the release root → ../lib
+for elf in ${release_dir}/bin/* ${release_dir}/pyosys/*.so; do
+    patch_rpath "${elf}" '$ORIGIN/../lib'
+done
+
+# lib/yosys/*.so is two levels below the release root → ../../lib
+for elf in ${release_dir}/lib/yosys/*.so; do
+    patch_rpath "${elf}" '$ORIGIN/../../lib'
+done
+
+# share/yosys/plugins/*.so is three levels below the release root → ../../../lib
+for elf in ${release_dir}/share/yosys/plugins/*.so; do
+    patch_rpath "${elf}" '$ORIGIN/../../../lib'
+done
+
+echo "=== Library bundling complete ==="
 
 # Flat-layout Python package setup.
 # dv_flow/ goes directly at the release root (not under src/) so that
