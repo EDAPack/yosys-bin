@@ -7,7 +7,24 @@ if test "x${CI_BUILD}" != "x"; then
         dnf update -y
         dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf
         export PATH=/opt/python/cp310-cp310/bin:$PATH
-        rls_plat="manylinux-x64"
+        # Detect glibc version to set platform tag and version-specific sonames.
+        glibc_ver=$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$')
+        case "$glibc_ver" in
+            2.17)
+                rls_plat="manylinux_2_17-x64"
+                bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6"
+                ;;
+            2.28)
+                rls_plat="manylinux_2_28-x64"
+                bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6"
+                ;;
+            *)
+                rls_plat="manylinux_2_34-x64"
+                bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6"
+                ;;
+        esac
+        echo "Detected glibc ${glibc_ver} -> platform ${rls_plat}"
+        echo "Libraries to bundle: ${bundle_sonames}"
     elif test $(uname -s) = "Windows"; then
         rls_plat="windows-x64"
     fi
@@ -66,8 +83,13 @@ cd ${proj}/yosys-slang
 git submodule update --init --recursive
 if test $? -ne 0; then exit 1; fi
 
+# Always remove any stale CMakeCache so the compiler is re-detected from PATH.
+rm -rf build
+
 cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER="$(which gcc)" \
+    -DCMAKE_CXX_COMPILER="$(which g++)" \
     -DYOSYS_CONFIG=${release_dir}/bin/yosys-config \
     -DBUILD_AS_PLUGIN=ON
 if test $? -ne 0; then exit 1; fi
@@ -213,9 +235,13 @@ bundle_lib() {
     fi
 }
 
-for soname in libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6; do
+for soname in ${bundle_sonames}; do
     bundle_lib "${soname}"
 done
+
+# Build a grep pattern from the bundled sonames so the RPATH patcher matches
+# only ELFs that actually link one of the bundled libraries.
+bundle_pattern=$(echo "${bundle_sonames}" | tr ' ' '\n' | sed 's/\./\\./g' | tr '\n' '|' | sed 's/|$//')
 
 # Patch RPATH on every installed ELF that links one of the bundled libraries.
 # We add $ORIGIN-relative paths so the binary finds lib/ regardless of where
@@ -224,7 +250,7 @@ patch_rpath() {
     elf="$1"
     rpath="$2"
     if ! file "${elf}" 2>/dev/null | grep -q ELF; then return; fi
-    if ldd "${elf}" 2>/dev/null | grep -qE 'libcrypt\.so\.2|libreadline\.so\.8|libffi\.so\.8|libtcl8\.6\.so|libtinfo\.so\.6'; then
+    if ldd "${elf}" 2>/dev/null | grep -qE "${bundle_pattern}"; then
         patchelf --add-rpath "${rpath}" "${elf}"
         echo "  RPATH '${rpath}' -> ${elf#${release_dir}/}"
     fi
