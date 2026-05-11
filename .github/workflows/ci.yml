@@ -31,39 +31,42 @@ jobs:
                 echo "yosys_latest_rls=${yosys_latest_rls}" >> ${GITHUB_OUTPUT}
                 echo "yosys_version=${yosys_version}.${BUILD_NUM}" >> ${GITHUB_OUTPUT}
 
-    # ── Linux builds (temporarily disabled while iterating on Windows) ──────────
-    # build-linux:
-    #     needs: version
-    #     runs-on: 'ubuntu-latest'
-    #     strategy:
-    #         matrix:
-    #             image:
-    #                 - quay.io/pypa/manylinux_2_28_x86_64
-    #                 - quay.io/pypa/manylinux_2_34_x86_64
-    #     steps:
-    #         - uses: actions/checkout@v4
-    #           with:
-    #             submodules: false
-    #         - name: build
-    #           env:
-    #             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    #             BUILD_NUM: ${{ github.run_id }}
-    #             CI_BUILD: 1
-    #             yosys_version: ${{ needs.version.outputs.yosys_version }}
-    #           run: >
-    #             docker run --rm
-    #             --volume "$(pwd):/io"
-    #             --env BUILD_NUM
-    #             --env CI_BUILD
-    #             --env yosys_version
-    #             --workdir /io
-    #             ${{ matrix.image }}
-    #             /io/scripts/build.sh
-    #         - name: Upload build artifact
-    #           uses: actions/upload-artifact@v4
-    #           with:
-    #             name: release-${{ strategy.job-index }}
-    #             path: release/*.tar.gz
+    build-linux:
+        needs: version
+        runs-on: 'ubuntu-latest'
+        strategy:
+            matrix:
+                image:
+                    - manylinux_2_28_x86_64
+                    - manylinux_2_34_x86_64
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                submodules: false
+            - name: build
+              env:
+                GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                BUILD_NUM: ${{ github.run_id }}
+                CI_BUILD: 1
+                image: ${{ matrix.image }}
+                yosys_version: ${{ needs.version.outputs.yosys_version }}
+              run: >
+                docker run --rm
+                --volume "$(pwd):/io"
+                --env BUILD_NUM
+                --env CI_BUILD
+                --env image
+                --env yosys_version
+                --workdir /io
+                quay.io/pypa/${{ matrix.image }}
+                /io/scripts/build.sh
+            - name: Upload build artifact
+              uses: actions/upload-artifact@v4
+              with:
+                name: yosys-${{ matrix.image }}
+                path: release/*.tar.gz
+                if-no-files-found: error
+                retention-days: 7
 
     # ── Generate Visual Studio source package (Linux) ─────────────────────────
     # Runs make vcxsrc inside yosys to produce a zip of the VS project.
@@ -116,11 +119,17 @@ jobs:
                 name: release-windows
                 path: release/*.zip
 
-    # ── Release (Windows only for now) ────────────────────────────────────────
+    # ── Release ───────────────────────────────────────────────────────────────
     release:
-        needs: [version, build-windows]
+        needs: [version, build-linux, build-windows]
         runs-on: 'ubuntu-latest'
         steps:
+            - name: Download Linux artifacts
+              uses: actions/download-artifact@v4
+              with:
+                pattern: yosys-manylinux*
+                path: artifacts
+                merge-multiple: true
             - name: Download Windows artifact
               uses: actions/download-artifact@v4
               with:
@@ -143,14 +152,19 @@ jobs:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               run: |
                 upload_url=$(echo "${{ steps.create_release.outputs.upload_url }}" | sed 's/{?name,label}//')
-                for f in artifacts/*.zip; do
+                for f in artifacts/*.zip artifacts/*.tar.gz; do
+                  [ -f "$f" ] || continue
                   name=$(basename "$f")
+                  case "$f" in
+                    *.zip)     content_type="application/zip" ;;
+                    *.tar.gz)  content_type="application/gzip" ;;
+                  esac
                   curl -s -L \
                     -X POST \
                     -H "Accept: application/vnd.github+json" \
                     -H "Authorization: Bearer ${GITHUB_TOKEN}" \
                     -H "X-GitHub-Api-Version: 2022-11-28" \
-                    -H "Content-Type: application/zip" \
+                    -H "Content-Type: ${content_type}" \
                     --data-binary "@${f}" \
                     "${upload_url}?name=${name}" \
                     | jq -r '.name // .message'
