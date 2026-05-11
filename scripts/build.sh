@@ -7,6 +7,18 @@ if test "x${CI_BUILD}" != "x"; then
         dnf update -y
         dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf
         export PATH=/opt/python/cp310-cp310/bin:$PATH
+        # Upgrade bison if the system version is too old (Yosys requires >= 3.6).
+        # manylinux_2_28 (AlmaLinux 8) ships bison 3.0.4.
+        bison_ver=$(bison --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        bison_major=$(echo "$bison_ver" | cut -d. -f1)
+        bison_minor=$(echo "$bison_ver" | cut -d. -f2)
+        if [ "$bison_major" -lt 3 ] || { [ "$bison_major" -eq 3 ] && [ "$bison_minor" -lt 6 ]; }; then
+            echo "System bison ${bison_ver} too old (need 3.6+), building bison 3.8.2 from source..."
+            curl -sL https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.gz -o /tmp/bison-3.8.2.tar.gz
+            tar -C /tmp -xzf /tmp/bison-3.8.2.tar.gz
+            cd /tmp/bison-3.8.2 && ./configure --prefix=/usr/local && make -j$(nproc) && make install
+            cd ${root}
+        fi
         # Detect glibc version to set platform tag and version-specific sonames.
         glibc_ver=$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$')
         case "$glibc_ver" in
