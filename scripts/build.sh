@@ -218,10 +218,14 @@ if test ! -d ${proj}/sv2v; then
 fi
 git config --global --add safe.directory ${proj}/sv2v
 cd ${proj}/sv2v
-# STACK_ALLOW_DIFFERENT_USER=1 lets Stack use a cache dir owned by a different
-# uid — needed when the cache is restored by the CI runner user but Docker runs
-# as root.
-STACK_ALLOW_DIFFERENT_USER=1 make
+# Ensure Stack will accept a cache dir owned by a different uid (e.g. the CI
+# runner user that restored the cache, while Docker runs as root).
+# Writing to the global config works even when the dir is foreign-owned because
+# root bypasses DAC permission checks inside the container.
+mkdir -p "${HOME}/.stack"
+grep -q 'allow-different-user' "${HOME}/.stack/config.yaml" 2>/dev/null || \
+    echo 'allow-different-user: true' >> "${HOME}/.stack/config.yaml"
+make
 if test $? -ne 0; then exit 1; fi
 cp bin/sv2v ${release_dir}/bin/
 chmod +x ${release_dir}/bin/sv2v
