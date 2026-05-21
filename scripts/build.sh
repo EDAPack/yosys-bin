@@ -218,7 +218,10 @@ if test ! -d ${proj}/sv2v; then
 fi
 git config --global --add safe.directory ${proj}/sv2v
 cd ${proj}/sv2v
-make
+# STACK_ALLOW_DIFFERENT_USER=1 lets Stack use a cache dir owned by a different
+# uid — needed when the cache is restored by the CI runner user but Docker runs
+# as root.
+STACK_ALLOW_DIFFERENT_USER=1 make
 if test $? -ne 0; then exit 1; fi
 cp bin/sv2v ${release_dir}/bin/
 chmod +x ${release_dir}/bin/sv2v
