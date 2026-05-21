@@ -43,6 +43,13 @@ jobs:
             - uses: actions/checkout@v4
               with:
                 submodules: false
+            - name: Cache Stack (Haskell toolchain + packages)
+              uses: actions/cache@v4
+              with:
+                path: .stack-cache
+                key: stack-${{ matrix.image }}-${{ hashFiles('scripts/build.sh') }}
+                restore-keys: |
+                    stack-${{ matrix.image }}-
             - name: build
               env:
                 GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,8 +58,10 @@ jobs:
                 image: ${{ matrix.image }}
                 yosys_version: ${{ needs.version.outputs.yosys_version }}
               run: >
+                mkdir -p .stack-cache &&
                 docker run --rm
                 --volume "$(pwd):/io"
+                --volume "$(pwd)/.stack-cache:/root/.stack"
                 --env BUILD_NUM
                 --env CI_BUILD
                 --env image

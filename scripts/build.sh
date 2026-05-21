@@ -5,7 +5,11 @@ root=$(pwd)
 if test "x${CI_BUILD}" != "x"; then
     if test $(uname -s) = "Linux"; then
         dnf update -y
-        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf
+        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf gmp-devel ncurses-devel
+        # Install Stack (Haskell build tool) for sv2v
+        if ! command -v stack >/dev/null 2>&1; then
+            curl -sSL https://get.haskellstack.org/ | sh -s - -d /usr/local/bin
+        fi
         export PATH=/opt/python/cp310-cp310/bin:$PATH
         # Upgrade bison if the system version is too old (Yosys requires >= 3.6).
         # manylinux_2_28 (AlmaLinux 8) ships bison 3.0.4.
@@ -24,15 +28,15 @@ if test "x${CI_BUILD}" != "x"; then
         case "$glibc_ver" in
             2.17)
                 rls_plat="manylinux_2_17-x64"
-                bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6"
+                bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
                 ;;
             2.28)
                 rls_plat="manylinux_2_28-x64"
-                bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6"
+                bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
                 ;;
             *)
                 rls_plat="manylinux_2_34-x64"
-                bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6"
+                bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
                 ;;
         esac
         echo "Detected glibc ${glibc_ver} -> platform ${rls_plat}"
@@ -201,6 +205,24 @@ git config --global --add safe.directory ${eqy_src}
 cd ${eqy_src}
 make install PREFIX=${release_dir} YOSYS_CONFIG=${release_dir}/bin/yosys-config
 if test $? -ne 0; then exit 1; fi
+cd ${proj}
+
+# ── sv2v (SystemVerilog-to-Verilog converter) ─────────────────────────────────
+# sv2v is written in Haskell and built with Stack. Stack downloads GHC
+# automatically into its own cache; set STACK_ROOT to a persistent location so
+# CI caches can warm it up between runs.
+echo "=== Building sv2v ==="
+if test ! -d ${proj}/sv2v; then
+    git clone --depth=1 https://github.com/zachjs/sv2v ${proj}/sv2v
+    if test $? -ne 0; then exit 1; fi
+fi
+git config --global --add safe.directory ${proj}/sv2v
+cd ${proj}/sv2v
+make
+if test $? -ne 0; then exit 1; fi
+cp bin/sv2v ${release_dir}/bin/
+chmod +x ${release_dir}/bin/sv2v
+echo "  Installed: bin/sv2v"
 cd ${proj}
 
 # ── Bundle non-guaranteed shared libraries ────────────────────────────────────
