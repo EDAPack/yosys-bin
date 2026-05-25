@@ -332,6 +332,24 @@ cp ${proj}/LICENSE ${release_dir}/
 cp ${proj}/ivpm.yaml ${release_dir}/
 cp ${proj}/scripts/export.envrc ${release_dir}/
 
+# ── Stage Agent Skills into the release ───────────────────────────────────────
+# Skills are authored under skills/<name>/ and listed in scripts/skill-manifest.yaml.
+# update/stage-skills.py validates each skill's frontmatter and binary references
+# and emits skills/index.json for downstream agent harnesses to discover.
+manifest="${proj}/scripts/skill-manifest.yaml"
+if test -f "${manifest}"; then
+    echo "=== Staging Agent Skills ==="
+    python3 "${proj}/../update/stage-skills.py" \
+        --manifest "${manifest}" \
+        --source-root "${proj}" \
+        --release-root "${release_dir}" \
+        --dest "${release_dir}/skills"
+    if test $? -ne 0; then
+        echo "ERROR: skill staging failed" >&2
+        exit 1
+    fi
+fi
+
 # Pre-generate egg-info so package metadata is present in the tarball.
 cd ${release_dir}
 pip install setuptools --quiet

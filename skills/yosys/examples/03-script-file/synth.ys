@@ -1,0 +1,11 @@
+# Equivalent of example 02 written as a script file (.ys).  Run with:
+#     yosys synth.ys
+# Comments use '#'.  Every line is a yosys command.
+
+read_verilog counter.v
+hierarchy -check -top counter
+proc; opt; fsm; memory; opt
+techmap; opt
+synth_ice40 -top counter
+write_json counter.json
+stat

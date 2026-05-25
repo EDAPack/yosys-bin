@@ -1,0 +1,13 @@
+# Agent Skills shipped in the yosys-bin release tarball.
+# Consumed by update/stage-skills.py from scripts/build.sh.
+# See SKILL_DEVELOPMENT_PROCESS.md (repo root) for the authoring process.
+skills:
+  - name: yosys
+    path: skills/yosys
+    binaries: [yosys]
+  - name: sby
+    path: skills/sby
+    binaries: [sby]
+  - name: sv2v
+    path: skills/sv2v
+    binaries: [sv2v]

@@ -1,0 +1,17 @@
+[tasks]
+bmc
+
+[options]
+mode bmc
+depth 10
+
+[engines]
+smtbmc boolector
+
+[script]
+read -define FORMAL
+read -formal counter.sv
+prep -top counter
+
+[files]
+counter.sv
