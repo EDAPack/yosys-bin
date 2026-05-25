@@ -339,7 +339,7 @@ cp ${proj}/scripts/export.envrc ${release_dir}/
 manifest="${proj}/scripts/skill-manifest.yaml"
 if test -f "${manifest}"; then
     echo "=== Staging Agent Skills ==="
-    python3 "${proj}/../update/stage-skills.py" \
+    python3 "${proj}/scripts/stage-skills.py" \
         --manifest "${manifest}" \
         --source-root "${proj}" \
         --release-root "${release_dir}" \
