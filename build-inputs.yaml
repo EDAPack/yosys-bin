@@ -1,0 +1,28 @@
+# Input components for yosys-bin, resolved by edapack-common's
+# resolve-inputs.py. See https://edapack.github.io (Developer Guide → build-inputs).
+schema: edapack.build-inputs/1
+
+core:
+  name: yosys
+  repo: https://github.com/YosysHQ/yosys
+  policy: latest-release       # pin with core_ref=v0.50 (or a branch/sha)
+
+dependencies:
+  - name: yosys-slang          # read_slang SystemVerilog front-end (plugin)
+    repo: https://github.com/povik/yosys-slang
+    policy: branch:master
+  - name: boolector            # SMT solver
+    repo: https://github.com/Boolector/boolector
+    policy: branch:master
+  - name: sby                  # SymbiYosys formal front-end (pure Python)
+    repo: https://github.com/YosysHQ/sby
+    policy: branch:main
+  - name: mcy                  # Mutation Cover with Yosys (pure Python)
+    repo: https://github.com/YosysHQ/mcy
+    policy: branch:main
+  - name: eqy                  # Equivalence Check with Yosys (plugins)
+    repo: https://github.com/YosysHQ/eqy
+    policy: branch:main
+  - name: sv2v                 # SystemVerilog->Verilog (Haskell)
+    repo: https://github.com/zachjs/sv2v
+    policy: branch:master

@@ -1,360 +1,174 @@
-#!/bin/sh -x
+#!/usr/bin/env bash
+# yosys-bin build driver.
+#
+# Builds yosys + yosys-slang + boolector + sby + mcy + eqy + sv2v from the exact
+# commits resolved by edapack-common's resolve-inputs.py and emits a release
+# manifest. Non-guaranteed shared libraries are bundled with $ORIGIN rpaths so
+# the release is self-contained.
+#
+# Runs in CI (reusable workflow) and locally (local-build.sh). All transient
+# state goes to WORK_DIR (the old in-tree cmake-wrapper/ that caused root-owned
+# files is now created under WORK_DIR); tarball + manifest land in OUT_DIR; the
+# source tree is never written to.
+set -euo pipefail
 
-root=$(pwd)
+# --- locate edapack-common --------------------------------------------------
+if [ -z "${EC_COMMON:-}" ]; then
+    _cand="$(cd "$(dirname "$0")/../../edapack-common" 2>/dev/null && pwd || true)"
+    [ -n "$_cand" ] && EC_COMMON="$_cand"
+fi
+if [ -z "${EC_COMMON:-}" ] || [ ! -f "$EC_COMMON/scripts/build-common.sh" ]; then
+    echo "ERROR: edapack-common not found. Set EC_COMMON or place edapack-common beside yosys-bin." >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+source "$EC_COMMON/scripts/build-common.sh"
 
-if test "x${CI_BUILD}" != "x"; then
-    if test $(uname -s) = "Linux"; then
-        dnf update -y
-        dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf gmp-devel ncurses-devel
-        # Install Stack (Haskell build tool) for sv2v
-        if ! command -v stack >/dev/null 2>&1; then
-            curl -sSL https://get.haskellstack.org/ | sh -s - -d /usr/local/bin
-        fi
-        export PATH=/opt/python/cp310-cp310/bin:$PATH
-        # Upgrade bison if the system version is too old (Yosys requires >= 3.6).
-        # manylinux_2_28 (AlmaLinux 8) ships bison 3.0.4.
-        bison_ver=$(bison --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
-        bison_major=$(echo "$bison_ver" | cut -d. -f1)
-        bison_minor=$(echo "$bison_ver" | cut -d. -f2)
-        if [ "$bison_major" -lt 3 ] || { [ "$bison_major" -eq 3 ] && [ "$bison_minor" -lt 6 ]; }; then
-            echo "System bison ${bison_ver} too old (need 3.6+), building bison 3.8.2 from source..."
-            curl -sL https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.gz -o /tmp/bison-3.8.2.tar.gz
-            tar -C /tmp -xzf /tmp/bison-3.8.2.tar.gz
-            cd /tmp/bison-3.8.2 && ./configure --prefix=/usr/local && make -j$(nproc) && make install
-            cd ${root}
-        fi
-        # Detect glibc version to set platform tag and version-specific sonames.
-        glibc_ver=$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$')
-        case "$glibc_ver" in
-            2.17)
-                rls_plat="manylinux_2_17-x64"
-                bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
-                ;;
-            2.28)
-                rls_plat="manylinux_2_28-x64"
-                bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
-                ;;
-            *)
-                rls_plat="manylinux_2_34-x64"
-                bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6 libgmp.so.10"
-                ;;
-        esac
-        echo "Detected glibc ${glibc_ver} -> platform ${rls_plat}"
-        echo "Libraries to bundle: ${bundle_sonames}"
-    elif test $(uname -s) = "Windows"; then
-        rls_plat="windows-x64"
-    fi
+: "${EC_PACKAGE:=yosys-bin}"
+export EC_PACKAGE
+ec_init_dirs
+ec_prepare_candidate
+
+os="$(uname -s)"
+plat="${EC_IMAGE_NAME:-}"
+njobs="$(nproc 2>/dev/null || echo 4)"
+
+# Degraded-mode dependency install (prebaked image already has the toolchain
+# + Stack). Kept for plain-manylinux fallback only.
+if [ "${EC_INSTALL_DEPS:-0}" = "1" ] && [ "$os" = "Linux" ]; then
+    dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel \
+        tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf \
+        gmp-devel ncurses-devel || true
+    command -v stack >/dev/null 2>&1 || curl -sSL https://get.haskellstack.org/ | sh -s - -d /usr/local/bin || true
 fi
 
-proj=$(pwd)
-if test "x${yosys_version}" != "x"; then
-    rls_version=${yosys_version}
-else
-    rls_version=1.0.0
-fi
+# --- glibc-specific bundle set (label + sonames) ----------------------------
+glibc_ver="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || echo 0)"
+case "$glibc_ver" in
+    2.17) bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux2014_x86_64}" ;;
+    2.28) bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_28_x86_64}" ;;
+    *)    bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_34_x86_64}" ;;
+esac
+ec_log "glibc $glibc_ver -> plat $plat; bundling: $bundle_sonames"
 
-release_dir="${root}/release/yosys-${rls_version}"
-rm -rf ${release_dir}
-mkdir -p ${release_dir}
+release_root="$WORK_DIR/release/yosys"
+rm -rf "$release_root"; mkdir -p "$release_root"
 
-if test ! -d yosys; then
-    git clone https://github.com/YosysHQ/yosys
-    if test $? -ne 0; then exit 1; fi
-fi
-# Allow git to operate on a directory that may be owned by the host user
-# (relevant when running as root inside a container with a bind-mounted repo).
-git config --global --add safe.directory ${proj}/yosys
-cd ${proj}/yosys
-git submodule update --init
-if test $? -ne 0; then exit 1; fi
-cd ${proj}
-
-# Build yosys (pyosys Python bindings disabled).
-cd ${proj}/yosys
-make -j$(nproc) PREFIX=${release_dir}
-if test $? -ne 0; then exit 1; fi
-
-make install PREFIX=${release_dir}
-if test $? -ne 0; then exit 1; fi
-
-chmod +x ${release_dir}/bin/*
-
-cd ${proj}
-
-# ── yosys-slang plugin ────────────────────────────────────────────────────────
-# yosys-slang provides a `read_slang` command for SystemVerilog elaboration.
-# slang and fmt are bundled as submodules and statically linked, so the output
-# slang.so has no external shared-library dependencies beyond what yosys itself
-# requires.  C++20 is needed; the manylinux_2_34 default GCC (11+) is sufficient.
-echo "=== Building yosys-slang ==="
-if test ! -d ${proj}/yosys-slang; then
-    git clone https://github.com/povik/yosys-slang ${proj}/yosys-slang
-    if test $? -ne 0; then exit 1; fi
-fi
-git config --global --add safe.directory ${proj}
-git config --global --add safe.directory ${proj}/yosys-slang
-git config --global --add safe.directory ${proj}/yosys-slang/third_party/slang
-git config --global --add safe.directory ${proj}/yosys-slang/third_party/fmt
-cd ${proj}/yosys-slang
-git submodule update --init --recursive
-if test $? -ne 0; then exit 1; fi
-
-# Always remove any stale CMakeCache so the compiler is re-detected from PATH.
-rm -rf build
-
-cmake -S . -B build \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER="$(which gcc)" \
-    -DCMAKE_CXX_COMPILER="$(which g++)" \
-    -DYOSYS_CONFIG=${release_dir}/bin/yosys-config \
-    -DBUILD_AS_PLUGIN=ON
-if test $? -ne 0; then exit 1; fi
-
-cmake --build build -j$(nproc)
-if test $? -ne 0; then exit 1; fi
-
-mkdir -p ${release_dir}/share/yosys/plugins
-cp build/slang.so ${release_dir}/share/yosys/plugins/
-echo "  Installed: share/yosys/plugins/slang.so"
-cd ${proj}
-
-# Build boolector SMT solver and install to bin
-if test ! -d boolector; then
-    git clone --depth=1 https://github.com/Boolector/boolector
-    if test $? -ne 0; then exit 1; fi
-fi
-cd ${proj}/boolector
-# Create a cmake wrapper that injects CMAKE_POLICY_VERSION_MINIMUM=3.5 so that
-# btor2tools (which has an old cmake_minimum_required) builds on modern CMake.
-mkdir -p ${proj}/cmake-wrapper
-cat > ${proj}/cmake-wrapper/cmake << 'CMAKEWRAP'
+# cmake policy shim for btor2tools' ancient cmake_minimum_required — created in
+# WORK_DIR (never the source tree) and used only for the boolector build.
+wrapper_dir="$WORK_DIR/cmake-wrapper"; mkdir -p "$wrapper_dir"
+cat > "$wrapper_dir/cmake" <<'CMAKEWRAP'
 #!/bin/sh
 exec /usr/bin/cmake -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_EXE_LINKER_FLAGS="-L/usr/lib64" "$@"
 CMAKEWRAP
-chmod +x ${proj}/cmake-wrapper/cmake
-export PATH=${proj}/cmake-wrapper:${PATH}
-./contrib/setup-lingeling.sh
-if test $? -ne 0; then exit 1; fi
-./contrib/setup-btor2tools.sh
-if test $? -ne 0; then exit 1; fi
-./configure.sh
-if test $? -ne 0; then exit 1; fi
-cd build
-make -j$(nproc)
-if test $? -ne 0; then exit 1; fi
-cp bin/boolector ${release_dir}/bin/
-chmod +x ${release_dir}/bin/boolector
-cd ${proj}
+chmod +x "$wrapper_dir/cmake"
 
-# ── sby (SymbiYosys) ──────────────────────────────────────────────────────────
-# sby is a formal verification front-end for Yosys.  It is pure Python so no
-# compilation is needed; make install copies the Python scripts and the launcher.
-echo "=== Installing sby ==="
-if test -d ${proj}/packages/sby; then
-    sby_src=${proj}/packages/sby
-elif test ! -d ${proj}/sby; then
-    git clone https://github.com/YosysHQ/sby ${proj}/sby
-    if test $? -ne 0; then exit 1; fi
-    sby_src=${proj}/sby
-else
-    sby_src=${proj}/sby
-fi
-git config --global --add safe.directory ${sby_src}
-cd ${sby_src}
-make install PREFIX=${release_dir}
-if test $? -ne 0; then exit 1; fi
-cd ${proj}
+# --- clone resolved inputs --------------------------------------------------
+yosys_src="$(ec_clone_input yosys "$(ec_input_get yosys repo)" "$(ec_input_get yosys resolved_sha)")"
+slang_src="$(ec_clone_input yosys-slang "$(ec_input_get yosys-slang repo)" "$(ec_input_get yosys-slang resolved_sha)")"
+boolector_src="$(ec_clone_input boolector "$(ec_input_get boolector repo)" "$(ec_input_get boolector resolved_sha)")"
+sby_src="$(ec_clone_input sby "$(ec_input_get sby repo)" "$(ec_input_get sby resolved_sha)")"
+mcy_src="$(ec_clone_input mcy "$(ec_input_get mcy repo)" "$(ec_input_get mcy resolved_sha)")"
+eqy_src="$(ec_clone_input eqy "$(ec_input_get eqy repo)" "$(ec_input_get eqy resolved_sha)")"
+sv2v_src="$(ec_clone_input sv2v "$(ec_input_get sv2v repo)" "$(ec_input_get sv2v resolved_sha)")"
 
-# ── mcy (Mutation Cover with Yosys) ──────────────────────────────────────────
-# mcy is pure Python (plus an optional Qt GUI which we skip here because the
-# build container does not have Qt installed).  Install scripts manually.
-echo "=== Installing mcy ==="
-if test -d ${proj}/packages/mcy; then
-    mcy_src=${proj}/packages/mcy
-elif test ! -d ${proj}/mcy; then
-    git clone https://github.com/YosysHQ/mcy ${proj}/mcy
-    if test $? -ne 0; then exit 1; fi
-    mcy_src=${proj}/mcy
-else
-    mcy_src=${proj}/mcy
-fi
-git config --global --add safe.directory ${mcy_src}
-mkdir -p ${release_dir}/bin
-install ${mcy_src}/mcy.py ${release_dir}/bin/mcy
-install ${mcy_src}/mcy-dash.py ${release_dir}/bin/mcy-dash
-mkdir -p ${release_dir}/share/mcy/dash
-cp -r ${mcy_src}/dash/. ${release_dir}/share/mcy/dash/.
-mkdir -p ${release_dir}/share/mcy/scripts
-cp -r ${mcy_src}/scripts/. ${release_dir}/share/mcy/scripts/.
-cd ${proj}
+# --- yosys core -------------------------------------------------------------
+make -C "$yosys_src" -j"$njobs" PREFIX="$release_root"
+make -C "$yosys_src" install PREFIX="$release_root"
+chmod +x "$release_root"/bin/* 2>/dev/null || true
 
-# ── eqy (Equivalence Check with Yosys) ───────────────────────────────────────
-# eqy ships three Yosys plugins (.so) that must be compiled against the already-
-# installed yosys headers via yosys-config --build.
-echo "=== Building and installing eqy ==="
-if test -d ${proj}/packages/eqy; then
-    eqy_src=${proj}/packages/eqy
-elif test ! -d ${proj}/eqy; then
-    git clone https://github.com/YosysHQ/eqy ${proj}/eqy
-    if test $? -ne 0; then exit 1; fi
-    eqy_src=${proj}/eqy
-else
-    eqy_src=${proj}/eqy
-fi
-git config --global --add safe.directory ${eqy_src}
-cd ${eqy_src}
-make install PREFIX=${release_dir} YOSYS_CONFIG=${release_dir}/bin/yosys-config
-if test $? -ne 0; then exit 1; fi
-cd ${proj}
+# --- yosys-slang plugin -----------------------------------------------------
+rm -rf "$slang_src/build"
+cmake -S "$slang_src" -B "$slang_src/build" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_C_COMPILER="$(which gcc)" \
+    -DCMAKE_CXX_COMPILER="$(which g++)" \
+    -DYOSYS_CONFIG="$release_root/bin/yosys-config" \
+    -DBUILD_AS_PLUGIN=ON
+cmake --build "$slang_src/build" -j"$njobs"
+mkdir -p "$release_root/share/yosys/plugins"
+cp "$slang_src/build/slang.so" "$release_root/share/yosys/plugins/"
 
-# ── sv2v (SystemVerilog-to-Verilog converter) ─────────────────────────────────
-# sv2v is written in Haskell and built with Stack. Stack downloads GHC
-# automatically into its own cache; set STACK_ROOT to a persistent location so
-# CI caches can warm it up between runs.
-echo "=== Building sv2v ==="
-if test ! -d ${proj}/sv2v; then
-    git clone --depth=1 https://github.com/zachjs/sv2v ${proj}/sv2v
-    if test $? -ne 0; then exit 1; fi
-fi
-git config --global --add safe.directory ${proj}/sv2v
-cd ${proj}/sv2v
-# Ensure Stack will accept a cache dir owned by a different uid (e.g. the CI
-# runner user that restored the cache, while Docker runs as root).
-# Writing to the global config works even when the dir is foreign-owned because
-# root bypasses DAC permission checks inside the container.
-mkdir -p "${HOME}/.stack"
-grep -q 'allow-different-user' "${HOME}/.stack/config.yaml" 2>/dev/null || \
-    echo 'allow-different-user: true' >> "${HOME}/.stack/config.yaml"
-make
-if test $? -ne 0; then exit 1; fi
-cp bin/sv2v ${release_dir}/bin/
-chmod +x ${release_dir}/bin/sv2v
-echo "  Installed: bin/sv2v"
-cd ${proj}
+# --- boolector (uses the policy-shim cmake) ---------------------------------
+(
+    cd "$boolector_src"
+    export PATH="$wrapper_dir:$PATH"
+    ./contrib/setup-lingeling.sh
+    ./contrib/setup-btor2tools.sh
+    ./configure.sh
+    make -C build -j"$njobs"
+)
+cp "$boolector_src/build/bin/boolector" "$release_root/bin/"
+chmod +x "$release_root/bin/boolector"
 
-# ── Bundle non-guaranteed shared libraries ────────────────────────────────────
-# The release must be self-contained: any library that is not part of the base
-# OS on every supported target (glibc 2.34+ / manylinux_2_34) is copied into
-# lib/ and the ELFs that need it are patched with an $ORIGIN-relative RPATH so
-# the dynamic linker finds the bundled copy first.
-#
-# Libraries bundled here and why they are not "nearly-guaranteed":
-#   libcrypt.so.2  – provided by libxcrypt; absent by default on Ubuntu 22.04+
-#                    and many other non-RHEL distros (they ship only .so.1)
-#   libreadline.so.8 – readline 8; not always installed (some systems have 7)
-#   libffi.so.8    – libffi 3.4; not always installed on non-devel systems
-#   libtcl8.6.so   – Tcl 8.6; not always installed
-#   libtinfo.so.6  – ncurses 6 (terminal DB); not always present separately
-#
-# Libraries intentionally NOT bundled (present on every glibc 2.34+ system):
-#   libc, libm, libgcc_s, libstdc++ (guaranteed by manylinux ABI), libz
-echo "=== Bundling non-guaranteed shared libraries ==="
-mkdir -p ${release_dir}/lib
+# --- sby (pure Python) ------------------------------------------------------
+make -C "$sby_src" install PREFIX="$release_root"
 
+# --- mcy (pure Python + dash assets) ----------------------------------------
+mkdir -p "$release_root/bin"
+install "$mcy_src/mcy.py" "$release_root/bin/mcy"
+install "$mcy_src/mcy-dash.py" "$release_root/bin/mcy-dash"
+mkdir -p "$release_root/share/mcy/dash" "$release_root/share/mcy/scripts"
+cp -r "$mcy_src/dash/." "$release_root/share/mcy/dash/."
+cp -r "$mcy_src/scripts/." "$release_root/share/mcy/scripts/."
+
+# --- eqy (plugins built against installed yosys) ----------------------------
+make -C "$eqy_src" install PREFIX="$release_root" YOSYS_CONFIG="$release_root/bin/yosys-config"
+
+# --- sv2v (Haskell / Stack) -------------------------------------------------
+(
+    cd "$sv2v_src"
+    mkdir -p "${HOME}/.stack"
+    grep -q 'allow-different-user' "${HOME}/.stack/config.yaml" 2>/dev/null \
+        || echo 'allow-different-user: true' >> "${HOME}/.stack/config.yaml"
+    make
+)
+cp "$sv2v_src/bin/sv2v" "$release_root/bin/"
+chmod +x "$release_root/bin/sv2v"
+
+# --- bundle non-guaranteed shared libraries + patch rpaths ------------------
+mkdir -p "$release_root/lib"
 bundle_lib() {
-    # bundle_lib <soname>  – copy the real file (resolving symlinks) and create
-    # a soname symlink in ${release_dir}/lib/ if the library is found.
-    soname="$1"
-    found=$(ldconfig -p 2>/dev/null | grep " ${soname} " | awk '{print $NF}' | head -1)
-    if test -z "${found}"; then
-        found=$(find /lib64 /usr/lib64 /lib /usr/lib -name "${soname}" 2>/dev/null | head -1)
-    fi
-    if test -n "${found}"; then
-        # Copy the real file (dereference symlinks so we get the actual .so.X.Y.Z)
-        real=$(readlink -f "${found}")
-        cp "${real}" ${release_dir}/lib/
-        realname=$(basename "${real}")
-        # Create soname symlink if the real name differs (e.g. libcrypt.so.2.0.0 → libcrypt.so.2)
-        if test "${realname}" != "${soname}"; then
-            ln -sf "${realname}" ${release_dir}/lib/${soname}
-        fi
-        echo "  Bundled ${soname} (${real})"
-        return 0
-    else
-        echo "  WARNING: ${soname} not found in build environment – skipping"
-        return 1
-    fi
+    local soname="$1" found real realname
+    # `|| true`: with `set -o pipefail`, a no-match grep / non-zero find would
+    # otherwise abort the whole build when a soname isn't in the ldconfig cache.
+    found="$(ldconfig -p 2>/dev/null | grep " ${soname} " | awk '{print $NF}' | head -1 || true)"
+    [ -n "$found" ] || found="$(find /lib64 /usr/lib64 /lib /usr/lib -name "${soname}" 2>/dev/null | head -1 || true)"
+    [ -n "$found" ] || { ec_log "WARNING: ${soname} not found — skipping"; return 0; }
+    real="$(readlink -f "$found")"
+    cp "$real" "$release_root/lib/"
+    realname="$(basename "$real")"
+    [ "$realname" != "$soname" ] && ln -sf "$realname" "$release_root/lib/${soname}"
+    ec_log "bundled ${soname} (${real})"
 }
+for soname in $bundle_sonames; do bundle_lib "$soname"; done
 
-for soname in ${bundle_sonames}; do
-    bundle_lib "${soname}"
-done
-
-# Build a grep pattern from the bundled sonames so the RPATH patcher matches
-# only ELFs that actually link one of the bundled libraries.
-bundle_pattern=$(echo "${bundle_sonames}" | tr ' ' '\n' | sed 's/\./\\./g' | tr '\n' '|' | sed 's/|$//')
-
-# Patch RPATH on every installed ELF that links one of the bundled libraries.
-# We add $ORIGIN-relative paths so the binary finds lib/ regardless of where
-# the release tree is installed.
+bundle_pattern="$(echo "$bundle_sonames" | tr ' ' '\n' | sed 's/\./\\./g' | tr '\n' '|' | sed 's/|$//')"
 patch_rpath() {
-    elf="$1"
-    rpath="$2"
-    if ! file "${elf}" 2>/dev/null | grep -q ELF; then return; fi
-    if ldd "${elf}" 2>/dev/null | grep -qE "${bundle_pattern}"; then
-        patchelf --add-rpath "${rpath}" "${elf}"
-        echo "  RPATH '${rpath}' -> ${elf#${release_dir}/}"
+    local elf="$1" rpath="$2"
+    file "$elf" 2>/dev/null | grep -q ELF || return 0
+    if ldd "$elf" 2>/dev/null | grep -qE "$bundle_pattern"; then
+        patchelf --add-rpath "$rpath" "$elf" && ec_log "rpath '$rpath' -> ${elf#"$release_root"/}"
     fi
 }
+for elf in "$release_root"/bin/*; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../lib'; done
+for elf in "$release_root"/lib/yosys/*.so; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../../lib'; done
+for elf in "$release_root"/share/yosys/plugins/*.so; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../../../lib'; done
 
-# bin/* are one level below the release root → ../lib
-for elf in ${release_dir}/bin/*; do
-    patch_rpath "${elf}" '$ORIGIN/../lib'
-done
+# --- dv_flow python package + release pyproject -----------------------------
+mkdir -p "$release_root/dv_flow"
+cp -r "$SRC_DIR/src/dv_flow/libyosys" "$release_root/dv_flow/"
+pip_version="$(echo "$EC_VERSION" | sed -e 's/^[^0-9]*//')"
+sed "s/%%VERSION%%/${pip_version}/" "$SRC_DIR/scripts/pyproject-release.toml" > "$release_root/pyproject.toml"
+cp "$SRC_DIR/LICENSE" "$release_root/"
+cp "$SRC_DIR/ivpm.yaml" "$release_root/"
 
-# lib/yosys/*.so is two levels below the release root → ../../lib
-for elf in ${release_dir}/lib/yosys/*.so; do
-    patch_rpath "${elf}" '$ORIGIN/../../lib'
-done
+# --- shared release tail (skills + envrc + manifest) ------------------------
+ec_finalize_release "$SRC_DIR" "$release_root" "$CANDIDATE_JSON"
 
-# share/yosys/plugins/*.so is three levels below the release root → ../../../lib
-for elf in ${release_dir}/share/yosys/plugins/*.so; do
-    patch_rpath "${elf}" '$ORIGIN/../../../lib'
-done
+# Pre-generate egg-info so package metadata ships in the tarball.
+( cd "$release_root" && pip install setuptools --quiet && pip install --no-build-isolation --no-deps -e . --quiet )
 
-echo "=== Library bundling complete ==="
-
-# Flat-layout Python package setup.
-# dv_flow/ goes directly at the release root (not under src/) so that
-# PYTHONPATH=<release_dir> and pip install -e <release_dir> both work
-# without any extra path components.  dv_flow has no __init__.py so it
-# remains an implicit namespace package compatible with other dv_flow.* pkgs.
-mkdir -p ${release_dir}/dv_flow
-cp -r ${proj}/src/dv_flow/libyosys ${release_dir}/dv_flow/
-
-# Write the release pyproject.toml with a hardcoded version (no setuptools-scm
-# dependency at install time — the release tree is not a git repo).
-pip_version=$(echo ${rls_version} | sed -e 's/^[^0-9]*//')
-sed "s/%%VERSION%%/${pip_version}/" \
-    ${proj}/scripts/pyproject-release.toml > ${release_dir}/pyproject.toml
-
-cp ${proj}/LICENSE ${release_dir}/
-cp ${proj}/ivpm.yaml ${release_dir}/
-cp ${proj}/scripts/export.envrc ${release_dir}/
-
-# ── Stage Agent Skills into the release ───────────────────────────────────────
-# Skills are authored under skills/<name>/ and listed in scripts/skill-manifest.yaml.
-# update/stage-skills.py validates each skill's frontmatter and binary references
-# and emits skills/index.json for downstream agent harnesses to discover.
-manifest="${proj}/scripts/skill-manifest.yaml"
-if test -f "${manifest}"; then
-    echo "=== Staging Agent Skills ==="
-    python3 "${proj}/scripts/stage-skills.py" \
-        --manifest "${manifest}" \
-        --source-root "${proj}" \
-        --release-root "${release_dir}" \
-        --dest "${release_dir}/skills"
-    if test $? -ne 0; then
-        echo "ERROR: skill staging failed" >&2
-        exit 1
-    fi
-fi
-
-# Pre-generate egg-info so package metadata is present in the tarball.
-cd ${release_dir}
-pip install setuptools --quiet
-pip install --no-build-isolation --no-deps -e . --quiet
-if test $? -ne 0; then exit 1; fi
-
-cd ${root}/release
-tar czf yosys-bin-${rls_plat}-${rls_version}.tar.gz yosys-${rls_version}
+tarball="yosys-bin-${plat}-${EC_VERSION}.tar.gz"
+ec_make_tarball "$release_root" "$tarball"
+ec_log "build complete: $tarball"

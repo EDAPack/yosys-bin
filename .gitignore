@@ -169,3 +169,15 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# edapack: rootless build dirs + cloned input sources (legacy in-tree clones)
+cmake-wrapper/
+.build/
+dist/
+/yosys/
+/yosys-slang/
+/boolector/
+/sby/
+/mcy/
+/eqy/
+/sv2v/
