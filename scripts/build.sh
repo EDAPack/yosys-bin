@@ -14,8 +14,10 @@ set -euo pipefail
 
 # --- locate edapack-common --------------------------------------------------
 if [ -z "${EC_COMMON:-}" ]; then
-    _cand="$(cd "$(dirname "$0")/../../edapack-common" 2>/dev/null && pwd || true)"
-    [ -n "$_cand" ] && EC_COMMON="$_cand"
+    _repo="$(cd "$(dirname "$0")/.." && pwd)"
+    for _c in "$_repo/packages/edapack-common" "$_repo/../edapack-common"; do
+        if [ -f "$_c/scripts/build-common.sh" ]; then EC_COMMON="$_c"; break; fi
+    done
 fi
 if [ -z "${EC_COMMON:-}" ] || [ ! -f "$EC_COMMON/scripts/build-common.sh" ]; then
     echo "ERROR: edapack-common not found. Set EC_COMMON or place edapack-common beside yosys-bin." >&2
@@ -33,13 +35,24 @@ os="$(uname -s)"
 plat="${EC_IMAGE_NAME:-}"
 njobs="$(nproc 2>/dev/null || echo 4)"
 
-# Degraded-mode dependency install (prebaked image already has the toolchain
-# + Stack). Kept for plain-manylinux fallback only.
+# Provision the stock manylinux image (EC_INSTALL_DEPS=1 in CI/local).
 if [ "${EC_INSTALL_DEPS:-0}" = "1" ] && [ "$os" = "Linux" ]; then
     dnf install -y wget flex bison jq readline readline-devel libffi libffi-devel \
         tcl tcl-devel python3-devel zlib-devel cmake glibc-static gcc-c++ patchelf \
         gmp-devel ncurses-devel || true
     command -v stack >/dev/null 2>&1 || curl -sSL https://get.haskellstack.org/ | sh -s - -d /usr/local/bin || true
+    [ -d /opt/python/cp310-cp310/bin ] && export PATH=/opt/python/cp310-cp310/bin:$PATH
+    # Yosys needs bison >= 3.6; manylinux_2_28 (AlmaLinux 8) ships 3.0.4 — build
+    # 3.8.2 from source when the system bison is too old.
+    bison_ver="$(bison --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo 0.0)"
+    bmaj="${bison_ver%%.*}"; bmin="${bison_ver#*.}"
+    if [ "${bmaj:-0}" -lt 3 ] || { [ "${bmaj:-0}" -eq 3 ] && [ "${bmin:-0}" -lt 6 ]; }; then
+        ec_log "system bison ${bison_ver} too old; building bison 3.8.2"
+        curl -sL https://ftp.gnu.org/gnu/bison/bison-3.8.2.tar.gz -o /tmp/bison.tar.gz
+        tar -C /tmp -xzf /tmp/bison.tar.gz
+        ( cd /tmp/bison-3.8.2 && ./configure --prefix=/usr/local && make -j"$njobs" && make install )
+        hash -r
+    fi
 fi
 
 # --- glibc-specific bundle set (label + sonames) ----------------------------

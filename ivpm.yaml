@@ -10,6 +10,8 @@ package:
   dep-sets:
   - name: default-dev
     deps:
+    - name: edapack-common
+      url: https://github.com/edapack/edapack-common.git
     - name: dv-flow-mgr
       url: https://github.com/dv-flow/dv-flow-mgr.git
     - name: yosys
