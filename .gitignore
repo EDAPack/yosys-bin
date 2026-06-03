@@ -181,3 +181,6 @@ dist/
 /mcy/
 /eqy/
 /sv2v/
+
+# ivpm-fetched dependencies
+packages/
