@@ -1,28 +1,39 @@
 # Input components for yosys-bin, resolved by edapack-common's
 # resolve-inputs.py. See https://edapack.github.io (Developer Guide → build-inputs).
+#
+# Comments are kept in this header (not inline in the body) because the
+# published @v1 resolver's YAML parser neither strips trailing inline comments
+# nor skips comment lines when deciding a block's type.
+#   core yosys     - policy latest-release; pin with core_ref=v0.50
+#   yosys-slang    - read_slang SystemVerilog front-end (plugin)
+#   boolector      - SMT solver
+#   sby            - SymbiYosys formal front-end (pure Python)
+#   mcy            - Mutation Cover with Yosys (pure Python)
+#   eqy            - Equivalence Check with Yosys (plugins)
+#   sv2v           - SystemVerilog->Verilog (Haskell)
 schema: edapack.build-inputs/1
 
 core:
   name: yosys
   repo: https://github.com/YosysHQ/yosys
-  policy: latest-release       # pin with core_ref=v0.50 (or a branch/sha)
+  policy: latest-release
 
 dependencies:
-  - name: yosys-slang          # read_slang SystemVerilog front-end (plugin)
+  - name: yosys-slang
     repo: https://github.com/povik/yosys-slang
     policy: branch:master
-  - name: boolector            # SMT solver
+  - name: boolector
     repo: https://github.com/Boolector/boolector
     policy: branch:master
-  - name: sby                  # SymbiYosys formal front-end (pure Python)
+  - name: sby
     repo: https://github.com/YosysHQ/sby
     policy: branch:main
-  - name: mcy                  # Mutation Cover with Yosys (pure Python)
+  - name: mcy
     repo: https://github.com/YosysHQ/mcy
     policy: branch:main
-  - name: eqy                  # Equivalence Check with Yosys (plugins)
+  - name: eqy
     repo: https://github.com/YosysHQ/eqy
     policy: branch:main
-  - name: sv2v                 # SystemVerilog->Verilog (Haskell)
+  - name: sv2v
     repo: https://github.com/zachjs/sv2v
     policy: branch:master
