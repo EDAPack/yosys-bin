@@ -184,3 +184,12 @@ dist/
 
 # ivpm-fetched dependencies
 packages/
+
+# edapack: build artifacts that must never be committed (these are produced
+# by the build and previously bloated .git to 2GB when accidentally added)
+*.tar
+*.tar.gz
+*.tgz
+*.tar.bz2
+*.tar.xz
+*.zip
