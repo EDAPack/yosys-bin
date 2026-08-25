@@ -174,9 +174,10 @@ cp -r "$SRC_DIR/src/dv_flow/libyosys" "$release_root/dv_flow/"
 pip_version="$(echo "$EC_VERSION" | sed -e 's/^[^0-9]*//')"
 sed "s/%%VERSION%%/${pip_version}/" "$SRC_DIR/scripts/pyproject-release.toml" > "$release_root/pyproject.toml"
 cp "$SRC_DIR/LICENSE" "$release_root/"
-cp "$SRC_DIR/ivpm.yaml" "$release_root/"
 
-# --- shared release tail (skills + envrc + manifest) ------------------------
+# --- shared release tail (skills + envrc + ivpm.yaml + manifest) ------------
+# ivpm.yaml now comes from scripts/release-ivpm.yaml via ec_stage_release_ivpm,
+# not from this repo's own ivpm.yaml (which describes the *build*).
 ec_finalize_release "$SRC_DIR" "$release_root" "$CANDIDATE_JSON"
 
 # Pre-generate egg-info so package metadata ships in the tarball.

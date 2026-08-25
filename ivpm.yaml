@@ -7,8 +7,10 @@ package:
   # stays a lean set of runtime Python deps for consumers of a release.
   default-dep-set: default-dev
 
-  # When installed from a release tarball, prepend the bundled yosys binaries
-  # to PATH so downstream tasks can invoke `yosys` directly.
+  # NOTE: this file describes how to *build* yosys-bin and is not shipped. The
+  # manifest a release carries is scripts/release-ivpm.yaml, staged as
+  # ivpm.yaml by edapack-common's ec_stage_release_ivpm — keep the two in sync
+  # when the PATH layout or runtime deps change.
   env:
   - name: PATH
     path-prepend: "${IVPM_PACKAGES}/yosys-bin/bin"

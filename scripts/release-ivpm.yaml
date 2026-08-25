@@ -1,0 +1,22 @@
+# Consumer-facing ivpm manifest, staged into the release tarball as ivpm.yaml
+# by edapack-common's ec_stage_release_ivpm.
+#
+# This is NOT the project's ivpm.yaml. That one describes how to *build*
+# yosys-bin (yosys/sby/mcy/eqy sources, edapack-common, dv-flow-mgr); shipping
+# it made anyone installing a release fetch all of that just to run yosys.
+#
+# What a consumer of an installed release actually needs:
+#   - the bundled binaries on PATH
+#   - click, in a venv: sby is a Python program and imports it at runtime
+package:
+  name: yosys-bin
+
+  env:
+  - name: PATH
+    path-prepend: "${IVPM_PACKAGES}/yosys-bin/bin"
+
+  dep-sets:
+  - name: default
+    deps:
+    - name: click
+      src: pypi
