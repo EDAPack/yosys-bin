@@ -49,7 +49,7 @@ binaries work on any Linux system with glibc ≥ 2.34.</p>
 <p>The entire build is driven by <code class="docutils literal notranslate"><span class="pre">scripts/build.sh</span></code>.  Run it manually via
 Docker:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">docker</span> <span class="n">run</span> <span class="o">--</span><span class="n">rm</span> \
-    <span class="o">--</span><span class="n">volume</span> <span class="s2">&quot;$(pwd):/io&quot;</span> \
+    <span class="o">--</span><span class="n">volume</span> <span class="s2">"$(pwd):/io"</span> \
     <span class="o">--</span><span class="n">workdir</span> <span class="o">/</span><span class="n">io</span> \
     <span class="n">quay</span><span class="o">.</span><span class="n">io</span><span class="o">/</span><span class="n">pypa</span><span class="o">/</span><span class="n">manylinux_2_34_x86_64</span> \
     <span class="o">/</span><span class="n">io</span><span class="o">/</span><span class="n">scripts</span><span class="o">/</span><span class="n">build</span><span class="o">.</span><span class="n">sh</span>

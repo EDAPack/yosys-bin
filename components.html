@@ -71,9 +71,9 @@ versions without recompilation:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">pyosys</span>
 
 <span class="n">d</span> <span class="o">=</span> <span class="n">pyosys</span><span class="o">.</span><span class="n">Design</span><span class="p">()</span>
-<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">&quot;read_verilog -sv my_design.sv&quot;</span><span class="p">)</span>
-<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">&quot;synth -top my_top&quot;</span><span class="p">)</span>
-<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">&quot;write_json netlist.json&quot;</span><span class="p">)</span>
+<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">"read_verilog -sv my_design.sv"</span><span class="p">)</span>
+<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">"synth -top my_top"</span><span class="p">)</span>
+<span class="n">d</span><span class="o">.</span><span class="n">run_pass</span><span class="p">(</span><span class="s2">"write_json netlist.json"</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -111,9 +111,9 @@ Yosys formal verification flows to discharge proof obligations produced by
 <code class="docutils literal notranslate"><span class="pre">write_smt2</span></code>.</p>
 <p>The <code class="docutils literal notranslate"><span class="pre">boolector</span></code> binary is installed to <code class="docutils literal notranslate"><span class="pre">bin/boolector</span></code>.</p>
 <p>Typical usage with SymbiYosys / smtbmc:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">yosys</span> <span class="o">-</span><span class="n">p</span> <span class="s2">&quot;read_verilog -formal my_design.sv; </span><span class="se">\</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">yosys</span> <span class="o">-</span><span class="n">p</span> <span class="s2">"read_verilog -formal my_design.sv; </span><span class="se">\</span>
 <span class="s2">           prep -top my_top; </span><span class="se">\</span>
-<span class="s2">           write_smt2 -wires model.smt2&quot;</span>
+<span class="s2">           write_smt2 -wires model.smt2"</span>
 
 <span class="n">smtbmc</span> <span class="o">--</span><span class="n">solver</span> <span class="n">boolector</span> <span class="n">model</span><span class="o">.</span><span class="n">smt2</span>
 </pre></div>
