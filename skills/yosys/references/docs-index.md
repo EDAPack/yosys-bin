@@ -17,8 +17,8 @@ the SKILL.md.
 - **`synth_ice40` / `synth_ecp5` / `synth_xilinx` reference** —
   https://yosyshq.readthedocs.io/projects/yosys/en/latest/cmd/synth_ice40.html
   (swap arch in URL).
-- **yosys-slang plugin** — https://github.com/povik/yosys-slang
-  (loaded with `plugin -i slang`).
+- **slang SystemVerilog front-end** — https://github.com/povik/yosys-slang
+  (vendored by yosys since v0.67; use `read_slang` directly, no plugin load).
 - **Formal flows (sby)** — https://yosyshq.readthedocs.io/projects/sby/en/latest/
 
 ## Worked examples in the wild

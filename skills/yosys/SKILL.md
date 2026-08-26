@@ -40,8 +40,8 @@ debugging or customizing.
 Yosys is *not* tolerant of every Verilog dialect. The built-in frontend
 covers most Verilog-2005 and a useful SystemVerilog subset. For richer
 SV (interfaces, full assertions, complex generate), prefer
-`read_slang -f` (built into this release via the **yosys-slang** plugin
-— invoke `plugin -i slang` first if not auto-loaded) or pre-process
+`read_slang -f` (a built-in command in this release: yosys vendors the
+**slang** front-end, so no `plugin -i slang` is needed) or pre-process
 with **sv2v** (separate skill).
 
 ## Quick start
@@ -54,7 +54,7 @@ yosys -p 'read_verilog top.v; synth_ice40 -top top -json top.json'
 - **iCE40 synthesis →** `yosys -p 'read_verilog *.v; synth_ice40 -top <top> -json out.json'`
 - **ECP5 synthesis →** `yosys -p 'read_verilog *.v; synth_ecp5 -top <top> -json out.json'`
 - **Generic (no target) synth, useful for inspection →** `yosys -p 'read_verilog *.v; synth -top <top>; write_verilog out.v'`
-- **SystemVerilog via slang →** `yosys -p 'plugin -i slang; read_slang -f top.sv; synth_ice40 -top top -json out.json'`
+- **SystemVerilog via slang →** `yosys -p 'read_slang -f top.sv; synth_ice40 -top top -json out.json'`
 - **Run a script file →** `yosys flow.ys`
 - **Print design statistics →** `yosys -p 'read_verilog *.v; hierarchy -top <top>; proc; opt; stat'`
 - **Visualize a module (GraphViz) →** `yosys -p 'read_verilog foo.v; hierarchy -top foo; proc; show foo'`
@@ -86,7 +86,7 @@ Common *commands* (not flags) an agent should know:
 | Symptom (stderr fragment) | Likely cause | Fix |
 |---|---|---|
 | `ERROR: Module \`foo' not found!` | `-top` names a module yosys didn't read or that was renamed by parameters. | Verify `read_verilog` included the file; re-check the module name; if parameterized, set `-chparam`. |
-| `ERROR: syntax error, unexpected ... at file.sv:NN` | SV construct unsupported by built-in frontend. | Use `read_slang` (plugin -i slang) or preprocess with `sv2v`. |
+| `ERROR: syntax error, unexpected ... at file.sv:NN` | SV construct unsupported by built-in frontend. | Use `read_slang` (built in) or preprocess with `sv2v`. |
 | `ERROR: Failed to import cell ...` after `synth_ice40` | Black-box / unsupported primitive for the target. | Provide a model, use `-noflatten` to inspect, or pick the right `synth_*`. |
 | `Warning: Wire ... is used but has no driver.` | Missing file, typo, or unconnected port. | Re-check `read_verilog` file list; check port direction. |
 | `read_verilog` succeeds then `hierarchy -check` fails on instantiation | Module read but parameters/ports mismatched at instance. | Add `-chparam`; check generate scope. |
@@ -96,7 +96,7 @@ Common *commands* (not flags) an agent should know:
   `nextpnr-ecp5`, `nextpnr-nexus` (see `nextpnr-bin` skill). BLIF feeds
   `arachne-pnr`. Structural Verilog feeds OpenROAD / OpenSTA.
 - **Upstream of yosys.** `sv2v` (this package) translates SV to
-  Verilog-2005 when the slang plugin can't parse it. `verilator` only
+  Verilog-2005 when the slang front-end can't parse it. `verilator` only
   *lints/simulates* — it does not feed yosys.
 - **Sibling.** `sby` (this package) wraps yosys for formal verification;
   its task files contain inline yosys command blocks. See the `sby`

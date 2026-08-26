@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # yosys-bin build driver.
 #
-# Builds yosys + yosys-slang + boolector + sby + mcy + eqy + sv2v from the exact
-# commits resolved by edapack-common's resolve-inputs.py and emits a release
-# manifest. Non-guaranteed shared libraries are bundled with $ORIGIN rpaths so
+# Builds yosys (with its vendored slang frontend) + boolector + sby + mcy +
+# eqy + sv2v from the exact commits resolved by edapack-common's
+# resolve-inputs.py and emits a release manifest. Non-guaranteed shared libraries are bundled with $ORIGIN rpaths so
 # the release is self-contained.
 #
 # Runs in CI (reusable workflow) and locally (local-build.sh). All transient
@@ -53,6 +53,18 @@ if [ "${EC_INSTALL_DEPS:-0}" = "1" ] && [ "$os" = "Linux" ]; then
         ( cd /tmp/bison-3.8.2 && ./configure --prefix=/usr/local && make -j"$njobs" && make install )
         hash -r
     fi
+    # Yosys >= 0.67 is built with CMake and requires >= 3.28; AlmaLinux 8 ships
+    # older. Take the PyPI wheel, which is current and needs no extra repos.
+    # NOTE: this only shadows `cmake` on PATH — the boolector policy shim below
+    # deliberately calls /usr/bin/cmake, which must stay the system one.
+    cmake_ver="$(cmake --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1 || echo 0.0)"
+    cmaj="${cmake_ver%%.*}"; cmin="${cmake_ver#*.}"
+    if [ "${cmaj:-0}" -lt 3 ] || { [ "${cmaj:-0}" -eq 3 ] && [ "${cmin:-0}" -lt 28 ]; }; then
+        ec_log "system cmake ${cmake_ver} too old for yosys; installing the PyPI wheel"
+        pip install --quiet --upgrade cmake
+        hash -r
+        ec_log "cmake now $(cmake --version | head -1)"
+    fi
 fi
 
 # --- glibc-specific bundle set (label + sonames) ----------------------------
@@ -78,7 +90,6 @@ chmod +x "$wrapper_dir/cmake"
 
 # --- clone resolved inputs --------------------------------------------------
 yosys_src="$(ec_clone_input yosys "$(ec_input_get yosys repo)" "$(ec_input_get yosys resolved_sha)")"
-slang_src="$(ec_clone_input yosys-slang "$(ec_input_get yosys-slang repo)" "$(ec_input_get yosys-slang resolved_sha)")"
 boolector_src="$(ec_clone_input boolector "$(ec_input_get boolector repo)" "$(ec_input_get boolector resolved_sha)")"
 sby_src="$(ec_clone_input sby "$(ec_input_get sby repo)" "$(ec_input_get sby resolved_sha)")"
 mcy_src="$(ec_clone_input mcy "$(ec_input_get mcy repo)" "$(ec_input_get mcy resolved_sha)")"
@@ -86,21 +97,24 @@ eqy_src="$(ec_clone_input eqy "$(ec_input_get eqy repo)" "$(ec_input_get eqy res
 sv2v_src="$(ec_clone_input sv2v "$(ec_input_get sv2v repo)" "$(ec_input_get sv2v resolved_sha)")"
 
 # --- yosys core -------------------------------------------------------------
-make -C "$yosys_src" -j"$njobs" PREFIX="$release_root"
-make -C "$yosys_src" install PREFIX="$release_root"
-chmod +x "$release_root"/bin/* 2>/dev/null || true
-
-# --- yosys-slang plugin -----------------------------------------------------
-rm -rf "$slang_src/build"
-cmake -S "$slang_src" -B "$slang_src/build" \
+# Upstream deleted the Makefile in a727e7f6 ("Migrate build system to CMake");
+# v0.68 is CMake-only. This follows the build documented in yosys' README.
+#
+# slang is no longer a separate plugin: yosys vendors povik's frontend as the
+# libs/slang + frontends/slang/lib submodules and builds it in-tree, so
+# `read_slang` is a built-in command and `plugin -i slang` is no longer needed.
+# ec_clone_input clones submodules recursively, so both are present. Passed
+# explicitly because we depend on it rather than on the default staying OFF.
+rm -rf "$yosys_src/build"
+cmake -S "$yosys_src" -B "$yosys_src/build" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_C_COMPILER="$(which gcc)" \
-    -DCMAKE_CXX_COMPILER="$(which g++)" \
-    -DYOSYS_CONFIG="$release_root/bin/yosys-config" \
-    -DBUILD_AS_PLUGIN=ON
-cmake --build "$slang_src/build" -j"$njobs"
-mkdir -p "$release_root/share/yosys/plugins"
-cp "$slang_src/build/slang.so" "$release_root/share/yosys/plugins/"
+    -DCMAKE_INSTALL_PREFIX="$release_root" \
+    -DYOSYS_WITHOUT_SLANG=OFF
+cmake --build "$yosys_src/build" --parallel "$njobs"
+cmake --install "$yosys_src/build"
+chmod +x "$release_root"/bin/* 2>/dev/null || true
+ec_require_file "$release_root/bin/yosys" "yosys driver"
+ec_require_file "$release_root/bin/yosys-config" "yosys-config"
 
 # --- boolector (uses the policy-shim cmake) ---------------------------------
 (

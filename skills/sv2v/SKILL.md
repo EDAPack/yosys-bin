@@ -10,12 +10,12 @@ version: "0.0.13"
 ## When to use this skill
 - A downstream tool (older yosys frontend, `iverilog -g2005`, vendor
   simulator) chokes on a SystemVerilog construct.
-- The user has SV source and wants to feed `yosys` (without the slang
-  plugin) or `iverilog`.
+- The user has SV source and wants to feed a tool without a slang
+  front-end, or `iverilog`.
 - An error like "unexpected TOK_INTERFACE" or "syntax error" in a tool
   that only fully supports Verilog-2005.
 
-Prefer `read_slang` (the slang plugin in `yosys-bin`) when the goal is
+Prefer `read_slang` (built into yosys in `yosys-bin`) when the goal is
 synthesis and slang accepts the source — slang is closer to a real SV
 compiler. Reach for sv2v when you need a *file*, not just a yosys
 import.
@@ -74,7 +74,7 @@ sv2v top.sv pkg.sv > out.v
 | Yosys downstream still complains | sv2v emits Verilog-2005, but yosys defaults to that already. Re-run with `read_verilog` (no `-sv`). | Drop `-sv` from `read_verilog`. |
 
 ## Interop with edapack
-- **Upstream of yosys** when the slang plugin can't parse the source
+- **Upstream of yosys** when the slang front-end can't parse the source
   or you want a portable `.v` artifact.
 - **Upstream of iverilog** for older simulators that lack SV support.
 - **Standalone**: useful even outside edapack, e.g. to feed commercial

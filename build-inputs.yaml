@@ -4,8 +4,11 @@
 # Comments are kept in this header (not inline in the body) because the
 # published @v1 resolver's YAML parser neither strips trailing inline comments
 # nor skips comment lines when deciding a block's type.
-#   core yosys     - policy latest-release; pin with core_ref=v0.50
-#   yosys-slang    - read_slang SystemVerilog front-end (plugin)
+#   core yosys     - policy latest-release; pin with core_ref=v0.50.
+#                    Built with CMake since v0.67 (upstream deleted the
+#                    Makefile). Vendors the slang SystemVerilog front-end as a
+#                    submodule, so read_slang is built in and povik/yosys-slang
+#                    is no longer a separate input.
 #   boolector      - SMT solver
 #   sby            - SymbiYosys formal front-end (pure Python)
 #   mcy            - Mutation Cover with Yosys (pure Python)
@@ -19,9 +22,6 @@ core:
   policy: latest-release
 
 dependencies:
-  - name: yosys-slang
-    repo: https://github.com/povik/yosys-slang
-    policy: branch:master
   - name: boolector
     repo: https://github.com/Boolector/boolector
     policy: branch:master

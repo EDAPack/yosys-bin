@@ -28,7 +28,7 @@ ERROR: syntax error, unexpected TOK_STRUCT, expecting TOK_ID at file.sv:NN
 Cause: built-in `read_verilog -sv` does not implement the construct.
 
 Fix (in this order):
-1. Try the slang frontend: `plugin -i slang; read_slang -f file.sv`.
+1. Try the slang frontend: `read_slang -f file.sv`.
 2. If slang also fails, preprocess with `sv2v`:
    `sv2v file.sv > file.v && yosys -p 'read_verilog file.v; ...'`.
 
