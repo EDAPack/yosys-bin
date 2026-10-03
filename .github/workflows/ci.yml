@@ -26,7 +26,7 @@
 name: CI
 # Thin caller of the shared edapack build pipeline. Build/release logic lives in
 # edapack-common; input components are declared in build-inputs.yaml.
-# See https://edapack.github.io (Developer Guide).
+# See https://dvkit.org/edapack/ (Developer Guide).
 #
 # NOTE: previous bespoke workflow archived under .github/workflows-legacy/ci.yml.
 # Windows (x64) coverage from that workflow is a tracked follow-up. yosys builds
