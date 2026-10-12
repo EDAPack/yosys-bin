@@ -68,11 +68,22 @@ if [ "${EC_INSTALL_DEPS:-0}" = "1" ] && [ "$os" = "Linux" ]; then
 fi
 
 # --- glibc-specific bundle set (label + sonames) ----------------------------
+# Found 2026-10-12: on the real manylinux_2_28 runner, by the time this case
+# ran, $glibc_ver held "2.28\n0" (clean "2.28" in isolation; something between
+# here and the dnf/bison-from-source/haskellstack-installer block upstream
+# appends a stray "0" on its own line -- not tracked down further, since
+# glibc_ver only has one job: a 2-4 character major.minor label). An exact
+# `2.28)` match silently fell through to the `*` branch, which bundles
+# libcrypt.so.2/libreadline.so.8/libffi.so.8 -- sonames that exist on
+# manylinux_2_34, not on this AlmaLinux 8 based image. Re-extracting just the
+# leading X.Y, and matching on it as a prefix, makes the label immune to
+# whatever trails it.
 glibc_ver="$(ldd --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+$' || echo 0)"
+glibc_ver="$(printf '%s\n' "$glibc_ver" | head -1 | grep -oE '^[0-9]+\.[0-9]+' || echo 0)"
 case "$glibc_ver" in
-    2.17) bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux2014_x86_64}" ;;
-    2.28) bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_28_x86_64}" ;;
-    *)    bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_34_x86_64}" ;;
+    2.17*) bundle_sonames="libcrypt.so.1 libreadline.so.6 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux2014_x86_64}" ;;
+    2.28*) bundle_sonames="libcrypt.so.1 libreadline.so.7 libffi.so.6 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_28_x86_64}" ;;
+    *)     bundle_sonames="libcrypt.so.2 libreadline.so.8 libffi.so.8 libtcl8.6.so libtinfo.so.6 libgmp.so.10"; : "${plat:=manylinux_2_34_x86_64}" ;;
 esac
 ec_log "glibc $glibc_ver -> plat $plat; bundling: $bundle_sonames"
 
