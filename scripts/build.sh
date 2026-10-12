@@ -154,14 +154,22 @@ cp "$sv2v_src/bin/sv2v" "$release_root/bin/"
 chmod +x "$release_root/bin/sv2v"
 
 # --- bundle non-guaranteed shared libraries + patch rpaths ------------------
+# A soname in $bundle_sonames is "guaranteed": every arm (manylinux2014/2_28/
+# 2_34) declares the same promise -- this release is self-contained on any
+# glibc. A missing one used to be a silent `ec_log WARNING` that let a
+# half-bundled tarball ship (found 2026-10-12: libffi.so.6/libreadline.so.7/
+# libcrypt.so.1 were all absent from a published 2_28 build; only the
+# unrelated libgmp/libtinfo/libtcl8.6 had actually been copied). Both failure
+# paths below now abort the build instead of logging past it.
 mkdir -p "$release_root/lib"
+bundle_missing=""
 bundle_lib() {
     local soname="$1" found real realname
     # `|| true`: with `set -o pipefail`, a no-match grep / non-zero find would
     # otherwise abort the whole build when a soname isn't in the ldconfig cache.
     found="$(ldconfig -p 2>/dev/null | grep " ${soname} " | awk '{print $NF}' | head -1 || true)"
     [ -n "$found" ] || found="$(find /lib64 /usr/lib64 /lib /usr/lib -name "${soname}" 2>/dev/null | head -1 || true)"
-    [ -n "$found" ] || { ec_log "WARNING: ${soname} not found — skipping"; return 0; }
+    [ -n "$found" ] || { bundle_missing="$bundle_missing $soname"; return 0; }
     real="$(readlink -f "$found")"
     cp "$real" "$release_root/lib/"
     realname="$(basename "$real")"
@@ -169,6 +177,10 @@ bundle_lib() {
     ec_log "bundled ${soname} (${real})"
 }
 for soname in $bundle_sonames; do bundle_lib "$soname"; done
+if [ -n "$bundle_missing" ]; then
+    ec_log "ERROR: declared bundle sonames not found on the build host:$bundle_missing"
+    exit 1
+fi
 
 bundle_pattern="$(echo "$bundle_sonames" | tr ' ' '\n' | sed 's/\./\\./g' | tr '\n' '|' | sed 's/|$//')"
 patch_rpath() {
@@ -181,6 +193,29 @@ patch_rpath() {
 for elf in "$release_root"/bin/*; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../lib'; done
 for elf in "$release_root"/lib/yosys/*.so; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../../lib'; done
 for elf in "$release_root"/share/yosys/plugins/*.so; do [ -e "$elf" ] && patch_rpath "$elf" '$ORIGIN/../../../lib'; done
+
+# --- verify every shipped binary's bundle-pattern needs are actually in lib/
+# ldd still resolves these from the build host's own copies, so this does not
+# prove the binary RUNS standalone -- it proves the thing bundle_lib was
+# supposed to copy is really sitting in $release_root/lib, which is exactly
+# what silently went missing above. Catches it here, in CI, not in a
+# consumer's unrelated job months later.
+bundle_verify_failed=0
+verify_bundle() {
+    local elf="$1" needed
+    file "$elf" 2>/dev/null | grep -q ELF || return 0
+    while IFS= read -r needed; do
+        [ -n "$needed" ] || continue
+        if [ ! -e "$release_root/lib/$needed" ]; then
+            ec_log "ERROR: ${elf#"$release_root"/} needs $needed, not found in lib/"
+            bundle_verify_failed=1
+        fi
+    done < <(ldd "$elf" 2>/dev/null | grep -oE "$bundle_pattern" | sort -u)
+}
+for elf in "$release_root"/bin/*; do [ -e "$elf" ] && verify_bundle "$elf"; done
+for elf in "$release_root"/lib/yosys/*.so; do [ -e "$elf" ] && verify_bundle "$elf"; done
+for elf in "$release_root"/share/yosys/plugins/*.so; do [ -e "$elf" ] && verify_bundle "$elf"; done
+[ "$bundle_verify_failed" = 0 ] || { ec_log "ERROR: bundle verification failed"; exit 1; }
 
 # --- dv_flow python package + release pyproject -----------------------------
 mkdir -p "$release_root/dv_flow"
