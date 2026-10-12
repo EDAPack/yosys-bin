@@ -6,7 +6,8 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  # read-only since the Pages deploy left; nothing here writes to the repo.
+  contents: read
 
 jobs:
   build-docs:
@@ -24,8 +25,32 @@ jobs:
       - name: Build HTML docs
         run: sphinx-build -b html docs docs/_build/html
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: docs/_build/html
+      # `Deploy to GitHub Pages` WAS HERE and is deliberately gone.
+      #
+      #   - name: Deploy to GitHub Pages
+      #     uses: peaceiris' actions-gh-pages, v4
+      #           ^ deliberately not written as a path. git-sync's publish
+      #             preflight reads workflow files as TEXT, so quoting the
+      #             real `uses:` string here would make this COMMENT about a
+      #             deleted publisher register as a live one and block every
+      #             inbound sync of this repo. Measured, not theorised: it did
+      #             exactly that on 2026-08-31, and the same trap is already
+      #             live in two repos converted in waves 1 and 2.
+      #     with:
+      #       github_token: ${{ secrets.GITHUB_TOKEN }}
+      #       publish_dir: docs/_build/html
+      #
+      # It had no condition at all, and this workflow triggers on a push to the
+      # default branch -- which, since edapack joined the Forgejo <-> GitHub
+      # mirror on 2026-08-31, is something a five-minute sync cron performs. A
+      # mirror operation must never be a publishing operation.
+      #
+      # It is DELETED rather than gated because dvkit.org owns all
+      # documentation: this repo's docs are published to
+      # dvkit.org/edapack/yosys-bin/ from .forgejo/workflows/docs.yml, which
+      # uploads them as an artifact for the host-side poller. A tag-gated Pages
+      # deploy would still be a second publisher of the same content on a
+      # different schedule.
+      #
+      # The Sphinx build above STAYS, as a CI check. A broken cross-reference
+      # should fail here, not render as a dead link on dvkit.org.
