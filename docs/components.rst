@@ -94,9 +94,6 @@ Typical usage with SymbiYosys / smtbmc::
 
     smtbmc --solver boolector model.smt2
 
-Or use the DV Flow :ref:`FormalPrepare <task-formalprepare>` task to drive
-the full flow from a ``flow.dv`` description.
-
 sby — SymbiYosys
 ----------------
 
@@ -185,13 +182,3 @@ Example ``.eqy`` file::
 Run with::
 
     eqy -f my_check.eqy
-
-dv-flow-libyosys
-----------------
-
-``dv-flow-libyosys`` (Python package ``dv_flow.libyosys``) integrates Yosys
-with the `DV Flow <https://dv-flow.github.io/>`_ task framework.  It
-provides ready-made synthesis and formal-preparation tasks that can be wired
-into a larger EDA pipeline described in a ``flow.dv`` file.
-
-See :doc:`dvflow` for the full task reference.

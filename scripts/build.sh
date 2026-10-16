@@ -228,20 +228,12 @@ for elf in "$release_root"/lib/yosys/*.so; do [ -e "$elf" ] && verify_bundle "$e
 for elf in "$release_root"/share/yosys/plugins/*.so; do [ -e "$elf" ] && verify_bundle "$elf"; done
 [ "$bundle_verify_failed" = 0 ] || { ec_log "ERROR: bundle verification failed"; exit 1; }
 
-# --- dv_flow python package + release pyproject -----------------------------
-mkdir -p "$release_root/dv_flow"
-cp -r "$SRC_DIR/src/dv_flow/libyosys" "$release_root/dv_flow/"
-pip_version="$(echo "$EC_VERSION" | sed -e 's/^[^0-9]*//')"
-sed "s/%%VERSION%%/${pip_version}/" "$SRC_DIR/scripts/pyproject-release.toml" > "$release_root/pyproject.toml"
 cp "$SRC_DIR/LICENSE" "$release_root/"
 
 # --- shared release tail (skills + envrc + ivpm.yaml + manifest) ------------
 # ivpm.yaml now comes from scripts/release-ivpm.yaml via ec_stage_release_ivpm,
 # not from this repo's own ivpm.yaml (which describes the *build*).
 ec_finalize_release "$SRC_DIR" "$release_root" "$CANDIDATE_JSON"
-
-# Pre-generate egg-info so package metadata ships in the tarball.
-( cd "$release_root" && pip install setuptools --quiet && pip install --no-build-isolation --no-deps -e . --quiet )
 
 tarball="yosys-bin-${plat}-${EC_VERSION}.tar.gz"
 ec_make_tarball "$release_root" "$tarball"

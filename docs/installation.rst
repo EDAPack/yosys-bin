@@ -18,9 +18,6 @@ After installation the ``yosys`` binary will be available on ``PATH`` (via the
 
     $ python -c "import pyosys; print(pyosys.run_pass)"
 
-The ``dv_flow.libyosys`` entry-point is registered automatically so DV Flow
-can discover the Yosys synthesis tasks without any extra configuration.
-
 With IVPM
 ---------
 

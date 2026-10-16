@@ -23,8 +23,6 @@ several other libraries. yosys-bin provides ready-to-use binaries that:
 * Include `sby (SymbiYosys) <https://yosyshq.net/sby/>`_ for formal
   verification, `mcy <https://yosyshq.net/mcy/>`_ for mutation coverage
   analysis, and `eqy <https://yosyshq.net/eqy/>`_ for equivalence checking.
-* Integrate with the `DV Flow <https://dv-flow.github.io/>`_ task framework
-  via the ``dv-flow-libyosys`` package (``dv_flow.libyosys``).
 
 Bundled components
 ------------------
@@ -49,8 +47,6 @@ Bundled components
      - Mutation coverage analysis tool for formal verification test suites
    * - ``eqy``
      - Equivalence checking tool and Yosys plugins (``eqy_combine.so``, etc.)
-   * - ``dv-flow-libyosys``
-     - DV Flow task library: ``yosys.Synth``, ``yosys.FormalPrepare``, etc.
 
 Release naming
 --------------

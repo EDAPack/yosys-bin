@@ -14,7 +14,6 @@ in a single self-contained tarball.
    overview
    installation
    components
-   dvflow
    building
 
 Indices and tables

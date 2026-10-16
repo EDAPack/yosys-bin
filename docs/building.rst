@@ -48,15 +48,11 @@ The script performs the following steps in order:
    `Boolector/boolector <https://github.com/Boolector/boolector>`_ and
    builds the SMT solver binary.
 
-6. **DV Flow integration** — copies ``src/dv_flow/libyosys/`` into the
-   release tree and generates a release ``pyproject.toml`` with the
-   computed version.
-
-7. **Smoke tests** — runs the upstream Yosys Python test suite
+6. **Smoke tests** — runs the upstream Yosys Python test suite
    (``yosys/tests/pyosys/``) against each Python version to verify the
    multi-version bindings.
 
-8. **Tarball** — packs the release directory into
+7. **Tarball** — packs the release directory into
    ``release/yosys-bin-manylinux-x64-<version>.tar.gz``.
 
 Environment variables
@@ -119,13 +115,5 @@ The unpacked release directory contains::
       libyosys.cpython-313-x86_64-linux-gnu.so
       yosys-abc
       share/yosys/plugins/slang.so
-    dv_flow/
-      libyosys/
-        __init__.py
-        __ext__.py
-        synth.py
-        flow.dv
-        share/
-    pyproject.toml
     ivpm.yaml
     LICENSE
