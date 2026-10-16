@@ -51,7 +51,7 @@ on:
       prerelease:
         description: "Mark the release as prerelease"
         type: boolean
-        default: true
+        default: false
 
 jobs:
   build:
@@ -62,4 +62,8 @@ jobs:
       core_ref: ${{ inputs.core_ref || '' }}
       input_overrides: ${{ inputs.input_overrides || '{}' }}
       force: ${{ github.event_name == 'workflow_dispatch' && inputs.force }}
-      prerelease: ${{ github.event_name != 'workflow_dispatch' || inputs.prerelease }}
+      # Publish full releases. ivpm's gh-rls handler defaults to prerelease:false
+      # and resolves 'latest' by scanning releases newest-first, so a prerelease
+      # is invisible to consumers -- marking CI builds as prereleases pinned
+      # everyone to the last full release (vyosys-0.9.26713680176, 2026-05-31).
+      prerelease: ${{ github.event_name == 'workflow_dispatch' && inputs.prerelease }}
