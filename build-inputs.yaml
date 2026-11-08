@@ -12,7 +12,11 @@
 #   boolector      - SMT solver
 #   sby            - SymbiYosys formal front-end (pure Python)
 #   mcy            - Mutation Cover with Yosys (pure Python)
-#   eqy            - Equivalence Check with Yosys (plugins)
+#   eqy            - Equivalence Check with Yosys (plugins). Pinned to
+#                    7a92d84 (2026-09-16): eqy main from fb8b211 (#104) uses
+#                    the Design/Module::twines() API that yosys added after
+#                    v0.70, so it no longer builds against latest-release.
+#                    Return to branch:main once a yosys release has twines().
 #   sv2v           - SystemVerilog->Verilog (Haskell)
 schema: edapack.build-inputs/1
 
@@ -33,7 +37,7 @@ dependencies:
     policy: branch:main
   - name: eqy
     repo: https://github.com/YosysHQ/eqy
-    policy: branch:main
+    policy: tag:7a92d8441aa442dd1b5543458d6f1060a8f85dd1
   - name: sv2v
     repo: https://github.com/zachjs/sv2v
     policy: branch:master
